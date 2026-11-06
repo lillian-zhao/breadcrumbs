@@ -5,13 +5,14 @@ import { getStorage } from 'firebase/storage';
 /**
  * Firebase client config for the Breadcrumbs project.
  *
- * These values are NOT secrets - they ship with the client bundle and access
- * is enforced by Firestore/Storage Security Rules, not by hiding them.
- * The API layer only reads/writes through this client; server-side
- * (firebase-admin) code lives elsewhere and is not part of the app.
+ * The API key is provided via EXPO_PUBLIC_FIREBASE_API_KEY (set it in a
+ * gitignored .env file). The other values are public identifiers and access is
+ * enforced by Firestore/Storage Security Rules, not by hiding them. The API
+ * layer only reads/writes through this client; server-side (firebase-admin)
+ * code lives elsewhere and is not part of the app.
  */
 const firebaseConfig = {
-  apiKey: 'REDACTED_API_KEY',
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
   authDomain: 'breadcrumbs-bc286.firebaseapp.com',
   projectId: 'breadcrumbs-bc286',
   storageBucket: 'breadcrumbs-bc286.firebasestorage.app',

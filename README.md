@@ -27,6 +27,7 @@ node -v
 ~~~bash
 npm install
 npx expo install --fix   # align package versions with SDK 58
+cp .env.example .env     # then set EXPO_PUBLIC_FIREBASE_API_KEY in .env
 npx expo start
 ~~~
 
@@ -34,14 +35,15 @@ Then scan the QR code with Expo Go, or press i / a for the iOS / Android
 simulator.
 
 No native plugins or config plugins are required: Firebase is the JS SDK only,
-which runs in Expo Go without a development build. The Firebase web config is
-committed in src/api/firebase.ts - it is not secret; access is enforced by
-Firestore / Storage Security Rules, not by hiding the values.
+which runs in Expo Go without a development build. The Firebase web API key is
+read from EXPO_PUBLIC_FIREBASE_API_KEY (set it in the gitignored .env file); the
+other config values in src/api/firebase.ts are public identifiers. Access is
+enforced by Firestore / Storage Security Rules, not by hiding the values.
 
 A note on warnings: npm may print an "install-scripts ... not covered by
 allowScripts" warning for @firebase/util and protobufjs. Both postinstall scripts
-are optional for this app (the Firebase config is checked in rather than baked at
-install time), so the warning is safe to ignore.
+are optional for this app (the Firebase config is loaded from env rather than baked
+at install time), so the warning is safe to ignore.
 
 ## Data-access API
 
