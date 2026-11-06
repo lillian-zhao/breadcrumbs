@@ -3,11 +3,14 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Button, Caption, Card, ListRow, PageHeader, Pill, Screen, SectionHeading, StatusMessage } from '@/components/ui';
-import { linkedAccounts } from '@/data';
+import { useLinkedAccounts, type LinkedAccount } from '@/data';
 import { colors, fonts } from '@/theme';
 
 export default function LinkedAccounts() {
-  const [accounts, setAccounts] = useState(linkedAccounts);
+  const { data: linkedAccounts = [] } = useLinkedAccounts();
+  // Connect/disconnect isn't in the API yet, so changes stay on this screen.
+  const [edited, setAccounts] = useState<LinkedAccount[]>();
+  const accounts = edited ?? linkedAccounts;
   const [confirmGoogle, setConfirmGoogle] = useState(true);
 
   const google = accounts.find((account) => account.id === 'google');
@@ -17,14 +20,12 @@ export default function LinkedAccounts() {
       setConfirmGoogle(true);
       return;
     }
-    setAccounts((current) =>
-      current.map((account) => (account.id === id ? { ...account, connected: !account.connected } : account)),
-    );
+    setAccounts(accounts.map((account) => (account.id === id ? { ...account, connected: !account.connected } : account)));
   };
 
   const disconnectGoogle = () => {
-    setAccounts((current) =>
-      current.map((account) =>
+    setAccounts(
+      accounts.map((account) =>
         account.id === 'google' ? { ...account, connected: false, subtitle: 'Not connected' } : account,
       ),
     );

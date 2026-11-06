@@ -35,15 +35,19 @@ function friendshipDoc(d: Record<string, unknown>): FriendshipData {
   };
 }
 
+// The seeded project data predates this schema: users carry `username` (no
+// name/handle/bio) and crumbs carry `caption`/`visibility` (no note/audience/city).
+// Read both spellings so either shape maps onto the same domain types.
+
 function crumbDoc(id: string, d: Record<string, unknown>): CrumbData & { id: string } {
   return {
     id,
     userId: d.userId as string,
-    placeName: d.placeName as string,
-    city: d.city as string,
+    placeName: (d.placeName as string | undefined) ?? '',
+    city: (d.city as string | undefined) ?? '',
     visitedAt: toDate(d.visitedAt as Timestamp),
-    note: (d.note as string | null | undefined) ?? null,
-    audience: (d.audience as CrumbData['audience'] | undefined) ?? 'private',
+    note: (d.note as string | null | undefined) ?? (d.caption as string | null | undefined) ?? null,
+    audience: (d.audience as CrumbData['audience'] | undefined) ?? (d.visibility as CrumbData['audience'] | undefined) ?? 'private',
     photoIds: (d.photoIds as string[] | undefined) ?? [],
   };
 }
@@ -61,8 +65,8 @@ export const firestoreStore: DataStore = {
     const d = snap.data();
     return {
       id: snap.id,
-      name: (d.name as string) ?? '',
-      handle: (d.handle as string) ?? '',
+      name: (d.name as string | undefined) ?? (d.username as string | undefined) ?? snap.id,
+      handle: (d.handle as string | undefined) ?? '@' + snap.id,
       bio: (d.bio as string) ?? '',
       avatarPath: (d.avatarPath as string | null | undefined) ?? null,
       email: (d.email as string | null | undefined) ?? null,

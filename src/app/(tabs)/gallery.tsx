@@ -3,7 +3,7 @@ import { Fragment, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Divider, HeroTitle, Photo, PhotoCard, Pill, Screen, SearchField, SegmentedControl } from '@/components/ui';
-import { albums, gallerySections } from '@/data';
+import { useAlbums, useGallerySections } from '@/data';
 import { colors, fonts } from '@/theme';
 
 type GalleryView = 'photos' | 'albums';
@@ -13,6 +13,8 @@ export default function Gallery() {
   const [view, setView] = useState<GalleryView>('photos');
   const [filter, setFilter] = useState<GalleryFilter>('location');
   const [query, setQuery] = useState('');
+  const { data: albums = [] } = useAlbums();
+  const { data: gallerySections = [] } = useGallerySections();
 
   const filterTone = (value: GalleryFilter) => (filter === value ? 'selected' : 'muted');
 

@@ -3,13 +3,17 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Button, Divider, Photo, Pill, Screen, TitleRow } from '@/components/ui';
-import { featuredFriendIds, getFriend, highlights } from '@/data';
+import { useFriends, useHighlights } from '@/data';
 import { colors, fonts } from '@/theme';
 
-const featuredFriends = featuredFriendIds.map(getFriend);
+const featuredCount = 4;
 
 export default function Friends() {
-  const [selectedFriendId, setSelectedFriendId] = useState(featuredFriends[0].id);
+  const { data: friends = [] } = useFriends();
+  const { data: highlights = [] } = useHighlights();
+  const featuredFriends = friends.slice(0, featuredCount);
+  const [pickedFriendId, setSelectedFriendId] = useState<string>();
+  const selectedFriendId = pickedFriendId ?? featuredFriends[0]?.id;
 
   return (
     <Screen topOffset={22} paddingHorizontal={24}>
@@ -55,7 +59,7 @@ export default function Friends() {
             onPress={() => router.push(`/friend/${highlight.friendId}` as Href)}
             accessibilityRole="button"
           >
-            <Text style={styles.highlightTitle}>{getFriend(highlight.friendId).name}’s recent highlight</Text>
+            <Text style={styles.highlightTitle}>{highlight.friendName}’s recent highlight</Text>
             <View style={styles.highlightDetails}>
               <View style={styles.tags}>
                 <Pill label={highlight.tag} size="tag" tone="toast" />

@@ -14,16 +14,48 @@ import {
   Screen,
   SectionHeading,
 } from '@/components/ui';
-import { friends, friendWeeks, getFriend, highlights } from '@/data';
+import type { FriendshipState } from '@/api';
+import { acceptFriend, requestFriend, unfriend, useFriendProfile, useFriends, useHighlights } from '@/data';
 import { colors, fonts } from '@/theme';
+
+/** The follow pill for each relationship; null hides it. */
+function followAction(status: FriendshipState, friendId: string) {
+  switch (status.kind) {
+    case 'accepted':
+      return { label: 'Following', selected: true, run: () => unfriend(friendId) };
+    case 'pending':
+      return status.direction === 'incoming'
+        ? { label: 'Accept', selected: false, run: () => acceptFriend(friendId) }
+        : { label: 'Requested', selected: true, run: undefined };
+    case 'none':
+      return { label: 'Follow', selected: false, run: () => requestFriend(friendId) };
+    default:
+      return null;
+  }
+}
 
 export default function FriendProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const friendId = Array.isArray(id) ? id[0] : id;
-  const friend = friends.some((candidate) => candidate.id === friendId) ? getFriend(friendId) : getFriend('annie');
-  const highlight = highlights.find((item) => item.friendId === friend.id) ?? highlights[0];
-  const week = friendWeeks.find((item) => item.friendId === friend.id);
-  const [following, setFollowing] = useState(true);
+  const { data, loading, reload } = useFriendProfile(friendId);
+  const { data: highlights = [] } = useHighlights();
+  const { data: friends = [] } = useFriends();
+  const [saving, setSaving] = useState(false);
+
+  if (!data?.friend) {
+    return (
+      <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
+        <PageHeader back={{ label: 'Back' }} title={{ title: loading ? '…' : 'Not found', fontSize: 44, lineHeight: 49.28 }} />
+      </Screen>
+    );
+  }
+
+  const { friend, status } = data;
+  const isFriend = status.kind === 'accepted';
+  const highlight = highlights.find((item) => item.friendId === friend.id);
+  const activity = friends.find((item) => item.id === friend.id);
+  const follow = followAction(status, friend.id);
+  const runFollow = follow?.run;
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
@@ -39,28 +71,45 @@ export default function FriendProfile() {
           <Avatar photo={friend.avatar} size={104} />
           <Text style={styles.name}>{friend.name}</Text>
           <Text style={styles.handle}>{friend.handle}</Text>
-          <Pill
-            label={following ? 'Following' : 'Follow'}
-            icon={following ? require('@assets/icons/check.svg') : undefined}
-            tintIcons
-            tone={following ? 'selected' : 'default'}
-            onPress={() => setFollowing((value) => !value)}
-          />
+          {follow && (
+            <Pill
+              label={follow.label}
+              icon={follow.selected ? require('@assets/icons/check.svg') : undefined}
+              tintIcons
+              tone={follow.selected ? 'selected' : 'default'}
+              onPress={
+                runFollow && !saving
+                  ? () => {
+                      setSaving(true);
+                      runFollow()
+                        .catch(console.warn)
+                        .finally(() => {
+                          setSaving(false);
+                          reload();
+                        });
+                    }
+                  : undefined
+              }
+            />
+          )}
         </View>
 
         <Card>
-          <Text style={styles.bio}>{friend.bio}</Text>
-          <Caption>Friends only · You can see {friend.name}’s shared crumbs.</Caption>
+          {!!friend.bio && <Text style={styles.bio}>{friend.bio}</Text>}
+          <Caption>
+            {isFriend
+              ? `Friends only · You can see ${friend.name}’s shared crumbs.`
+              : `Follow ${friend.name} to see the crumbs they share with friends.`}
+          </Caption>
         </Card>
 
-        <SectionHeading label="recent highlight" fontSize={19} ruleOpacity={0.6} />
-        <Photo photo={highlight.photo} style={styles.highlight} />
-        <ListRow
-          title={highlight.tag}
-          subtitle={`Chicago · ${highlight.date}`}
-          actionLabel="View crumb"
-          onAction={() => {}}
-        />
+        {highlight && (
+          <>
+            <SectionHeading label="recent highlight" fontSize={19} ruleOpacity={0.6} />
+            <Photo photo={highlight.photo} style={styles.highlight} />
+            <ListRow title={highlight.tag} subtitle={highlight.date} actionLabel="View crumb" onAction={() => {}} />
+          </>
+        )}
 
         <SectionHeading label="discover together" fontSize={19} ruleOpacity={0.6} />
         <ListRow
@@ -79,7 +128,7 @@ export default function FriendProfile() {
         />
         <ListRow
           title={`${friend.name}’s weekly wrapped`}
-          subtitle={week ? `${week.places} places · ${week.newPlaces} new` : 'This week’s recap'}
+          subtitle={activity ? `${activity.places} places · ${activity.newPlaces} new` : 'This week’s recap'}
           actionLabel="View recap"
         />
 

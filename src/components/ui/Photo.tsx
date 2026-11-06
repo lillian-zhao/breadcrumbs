@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import type { Photo as PhotoData } from '@/data';
-import { radii } from '@/theme';
+import { colors, radii } from '@/theme';
 
 type Props = {
   photo: PhotoData;
@@ -33,6 +33,7 @@ export function Photo({ photo, radius = radii.card, style }: Props) {
 const styles = StyleSheet.create({
   frame: {
     overflow: 'hidden',
+    backgroundColor: colors.track,
   },
   cropped: {
     position: 'absolute',

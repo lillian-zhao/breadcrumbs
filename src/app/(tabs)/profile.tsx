@@ -15,28 +15,31 @@ import {
   SectionHeading,
   SegmentedControl,
 } from '@/components/ui';
-import { albums, currentUser, loggedDayShading, savedPlaces, today } from '@/data';
+import { emptyPhoto, useAlbums, useCurrentUser, useLoggedDays, useSavedPlaces } from '@/data';
 import { colors, fonts, radii } from '@/theme';
 
 type CalendarScale = 'month' | 'year';
 
-const stats = [
-  { value: currentUser.daysLogged, label: 'days logged' },
-  { value: currentUser.followers, label: 'followers' },
-  { value: currentUser.following, label: 'following' },
-];
-
 export default function Profile() {
+  const [today] = useState(() => new Date());
   const [visibleMonth, setVisibleMonth] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [scale, setScale] = useState<CalendarScale>('month');
+  const { data: currentUser } = useCurrentUser();
+  const { data: loggedDays = [] } = useLoggedDays(visibleMonth.year, visibleMonth.month);
+  const { data: savedPlaces = [] } = useSavedPlaces();
+  const { data: albums = [] } = useAlbums();
+
+  const stats = [
+    { value: currentUser?.daysLogged ?? '–', label: 'days logged' },
+    { value: currentUser?.followers ?? '–', label: 'followers' },
+    { value: currentUser?.following ?? '–', label: 'following' },
+  ];
 
   const shiftMonth = (delta: number) =>
     setVisibleMonth(({ year, month }) => {
       const next = new Date(year, month + delta, 1);
       return { year: next.getFullYear(), month: next.getMonth() };
     });
-
-  const isTodaysMonth = visibleMonth.year === today.getFullYear() && visibleMonth.month === today.getMonth();
 
   return (
     <Screen topOffset={20} contentWidth={354}>
@@ -52,8 +55,8 @@ export default function Profile() {
       </HeroTitle>
 
       <View style={styles.profileHeader}>
-        <Avatar photo={currentUser.avatar} size={116} />
-        <Text style={styles.name}>{currentUser.name}</Text>
+        <Avatar photo={currentUser?.avatar ?? emptyPhoto} size={116} />
+        <Text style={styles.name}>{currentUser?.name}</Text>
         <View style={styles.stats}>
           {stats.flatMap((stat, index) => [
             index > 0 && <View key={`${stat.label}-divider`} style={styles.statDivider} />,
@@ -110,7 +113,7 @@ export default function Profile() {
         year={visibleMonth.year}
         month={visibleMonth.month}
         today={today}
-        shadedDays={isTodaysMonth ? loggedDayShading : []}
+        shadedDays={loggedDays}
       />
 
       <Divider tone="toast" style={styles.calendarDivider} />

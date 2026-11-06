@@ -13,25 +13,39 @@ import {
   StatusMessage,
   TextField,
 } from '@/components/ui';
-import { currentUser } from '@/data';
+import { emptyPhoto, updateProfile, useCurrentUser } from '@/data';
 
 export default function EditProfile() {
-  const [name, setName] = useState(currentUser.name);
-  const [handle, setHandle] = useState(currentUser.handle);
-  const [bio, setBio] = useState(currentUser.bio);
+  const { data: currentUser } = useCurrentUser();
+  // Untouched fields show the saved profile; typing replaces them.
+  const [nameEdit, setName] = useState<string>();
+  const [handleEdit, setHandle] = useState<string>();
+  const [bioEdit, setBio] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  const name = nameEdit ?? currentUser?.name ?? '';
+  const handle = handleEdit ?? currentUser?.handle ?? '';
+  const bio = bioEdit ?? currentUser?.bio ?? '';
+
+  const save = () => {
+    setSaving(true);
+    updateProfile({ name, handle, bio })
+      .then(() => router.back())
+      .catch(console.warn)
+      .finally(() => setSaving(false));
+  };
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <PageHeader
         back={{ label: 'Settings' }}
         title={{ title: 'A little you', fontSize: 44, lineHeight: 49.28 }}
-        subtitle={`Edit profile · ${currentUser.name}`}
+        subtitle={currentUser ? `Edit profile · ${currentUser.name}` : 'Edit profile'}
         style={styles.header}
       />
 
       <View style={styles.content}>
         <View style={styles.photoEditor}>
-          <Avatar photo={currentUser.avatar} size={116} />
+          <Avatar photo={currentUser?.avatar ?? emptyPhoto} size={116} />
           <Pill label="Change profile photo" icon={require('@assets/icons/camera.svg')} tintIcons onPress={() => {}} />
         </View>
 
@@ -65,7 +79,7 @@ export default function EditProfile() {
 
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
-          <Button label="Save profile" fill onPress={() => router.back()} />
+          <Button label={saving ? 'Saving…' : 'Save profile'} fill onPress={saving || !currentUser ? undefined : save} />
         </View>
         <Caption align="center">Saving returns to your Profile with “Profile updated”.</Caption>
       </View>

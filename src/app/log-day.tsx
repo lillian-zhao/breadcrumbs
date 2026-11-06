@@ -13,7 +13,7 @@ import {
   SectionHeading,
   TextField,
 } from '@/components/ui';
-import { currentUser, todaysLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
+import { emptyPhoto, useCurrentUser, useDayLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
 import { colors, fonts } from '@/theme';
 
 const audienceHelp: Record<Audience, string> = {
@@ -45,10 +45,17 @@ function FeaturedStop({ stop, photo }: { stop: Stop; photo: PhotoData }) {
 }
 
 export default function LogDay() {
-  const [note, setNote] = useState(todaysLog.note);
-  const [audience, setAudience] = useState<Audience>(todaysLog.audience);
-  const [featured, ...otherStops] = todaysLog.stops;
-  const attachedCount = todaysLog.photos.length;
+  const [today] = useState(() => new Date());
+  const { data: currentUser } = useCurrentUser();
+  const { data: todaysLog } = useDayLog(today);
+  // Untouched fields show what's saved for today; editing replaces them.
+  const [noteEdit, setNote] = useState<string>();
+  const [audienceEdit, setAudience] = useState<Audience>();
+  const note = noteEdit ?? todaysLog?.note ?? '';
+  const audience = audienceEdit ?? todaysLog?.audience ?? 'private';
+  const [featured, ...otherStops] = todaysLog?.stops ?? [];
+  const attachedCount = todaysLog?.photos.length ?? 0;
+  const shortDate = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
@@ -60,23 +67,24 @@ export default function LogDay() {
           iconStyle: styles.returnIcon,
         }}
         title={{ title: 'Log a Day', fontSize: 44, lineHeight: 49.28 }}
-        subtitle={`${currentUser.name}’s crumbs · Today, Oct 5`}
+        subtitle={currentUser ? `${currentUser.name}’s crumbs · Today, ${shortDate}` : `Today, ${shortDate}`}
         style={styles.header}
       />
 
       <View style={styles.content}>
         <ListRow
           icon={require('@assets/icons/calendar-row.svg')}
-          title={formatDay(todaysLog.date)}
-          subtitle={`Today · ${todaysLog.location}`}
+          title={formatDay(today)}
+          subtitle={todaysLog?.location ? `Today · ${todaysLog.location}` : 'Today'}
           actionLabel="Change"
           onAction={() => {}}
         />
 
         <SectionHeading label="today’s stops" fontSize={19} ruleOpacity={0.6} />
         <Card>
-          {featured.photo && <FeaturedStop stop={featured} photo={featured.photo} />}
-          {otherStops.map((stop) => (
+          {!featured && <Text style={styles.caption}>No stops yet today. Add a location to start your trail.</Text>}
+          {featured?.photo && <FeaturedStop stop={featured} photo={featured.photo} />}
+          {(featured?.photo ? otherStops : todaysLog?.stops ?? []).map((stop) => (
             <ListRow
               key={stop.id}
               icon={require('@assets/icons/map-pin-row.svg')}
@@ -96,7 +104,7 @@ export default function LogDay() {
 
         <SectionHeading label="little moments" fontSize={19} ruleOpacity={0.6} />
         <View style={styles.moments}>
-          <Photo photo={todaysLog.photos[0]} style={styles.momentPhoto} />
+          <Photo photo={todaysLog?.photos[0] ?? emptyPhoto} style={styles.momentPhoto} />
           <View style={styles.photoAction}>
             <Button label="Add photo" variant="secondary" icon={require('@assets/icons/camera.svg')} onPress={() => {}} />
             <Text style={styles.caption}>

@@ -3,17 +3,25 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Caption, PageHeader, Pill, PlaceCard, Screen, SearchField, SectionHeading } from '@/components/ui';
-import { currentUser, savedPlaces } from '@/data';
+import { removeSavedPlace, useCurrentUser, useSavedPlaces } from '@/data';
 
 type CollectionView = 'list' | 'map';
 
 export default function SavedSpots() {
   const [query, setQuery] = useState('');
   const [view, setView] = useState<CollectionView>('list');
-  const [savedIds, setSavedIds] = useState(savedPlaces.map((place) => place.id));
+  const { data: currentUser } = useCurrentUser();
+  const { data: savedPlaces = [], reload } = useSavedPlaces();
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+
+  const remove = (placeId: string) => {
+    // Hide it right away; the reload afterwards reflects what actually got saved.
+    setRemovedIds((ids) => [...ids, placeId]);
+    removeSavedPlace(placeId).catch(console.warn).finally(reload);
+  };
 
   const places = useMemo(() => {
-    const visible = savedPlaces.filter((place) => savedIds.includes(place.id));
+    const visible = savedPlaces.filter((place) => !removedIds.includes(place.id));
     const needle = query.trim().toLowerCase();
     if (!needle) return visible;
     return visible.filter(
@@ -21,14 +29,14 @@ export default function SavedSpots() {
         place.name.toLowerCase().includes(needle) ||
         place.category.toLowerCase().includes(needle),
     );
-  }, [query, savedIds]);
+  }, [query, savedPlaces, removedIds]);
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <PageHeader
         back={{ label: 'Profile' }}
         title={{ title: 'Saved spots', fontSize: 44, lineHeight: 49.28 }}
-        subtitle={`${currentUser.name} · All your saved places`}
+        subtitle={currentUser ? `${currentUser.name} · All your saved places` : 'All your saved places'}
         style={styles.header}
       />
 
@@ -62,7 +70,7 @@ export default function SavedSpots() {
             subtitle={`${place.category} • ${place.price}`}
             caption="Saved to your spots · View place ↗"
             onPress={() => router.push('/map')}
-            onBookmark={() => setSavedIds((ids) => ids.filter((id) => id !== place.id))}
+            onBookmark={() => remove(place.id)}
           />
         ))}
 

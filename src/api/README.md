@@ -4,9 +4,10 @@ This directory is the app's data layer. It turns Firestore reads/writes into
 plain, typed functions and enforces access control in one place so the UI never
 talks to Firebase directly.
 
-It is NOT wired to any screen yet - that happens in a later step. Today there is
-no sign-in; the layer is designed so auth and permissions can be added without
-rewriting it.
+Screens reach it through the hooks in src/data/hooks.ts, which call the shared
+instance in client.ts and resolve Storage paths into image sources. Today there
+is no sign-in: client.ts acts as the seeded user 'lillian'. The layer is designed
+so auth and permissions can be added without rewriting it.
 
 ## Layout
 
@@ -16,6 +17,7 @@ rewriting it.
 - firebase.ts       - Firebase client init (app, Firestore, Storage)
 - firestore-store.ts - Firestore implementation of DataStore (the only module that imports the SDK)
 - index.ts          - createApi(options) factory that builds the public API
+- client.ts         - the app's Firestore-backed api instance and currentActor
 - testing/memory-store.ts - in-memory DataStore used by unit tests
 
 ## Firestore schema

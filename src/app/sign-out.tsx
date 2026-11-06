@@ -4,10 +4,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { Avatar, Button, Caption, ListRow, Screen, SectionHeading, StatusMessage } from '@/components/ui';
-import { currentUser } from '@/data';
+import { emptyPhoto, useCurrentUser } from '@/data';
 import { colors, fonts } from '@/theme';
 
 export default function SignOut() {
+  const { data: currentUser } = useCurrentUser();
+
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <View style={styles.sheet}>
@@ -20,10 +22,10 @@ export default function SignOut() {
         </View>
 
         <View style={styles.identity}>
-          <Avatar photo={currentUser.avatar} size={64} />
+          <Avatar photo={currentUser?.avatar ?? emptyPhoto} size={64} />
           <View style={styles.identityText}>
-            <Text style={styles.name}>{currentUser.name}</Text>
-            <Caption>{currentUser.handle} · Currently signed in</Caption>
+            <Text style={styles.name}>{currentUser?.name}</Text>
+            <Caption>{currentUser?.handle} · Currently signed in</Caption>
           </View>
         </View>
 
@@ -33,7 +35,7 @@ export default function SignOut() {
 
         <SectionHeading label="nothing gets deleted" fontSize={19} ruleOpacity={0.6} />
         <ListRow
-          title={`${currentUser.daysLogged} days logged`}
+          title={`${currentUser?.daysLogged ?? 0} days logged`}
           subtitle="Kept safely in your account"
           actionLabel="Kept"
         />

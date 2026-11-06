@@ -4,17 +4,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, BackButton, Divider, HeroTitle, ListRow, Screen, SegmentedControl, Toggle } from '@/components/ui';
-import { currentUser } from '@/data';
+import type { Preferences } from '@/api';
+import { emptyPhoto, updatePreferences, useCurrentUser, usePreferences } from '@/data';
 import { colors, fonts, shadows } from '@/theme';
 
 type SettingsTab = 'general' | 'sharing';
-
-type Preferences = {
-  notifications: boolean;
-  locationServices: boolean;
-  weeklyEmail: boolean;
-  darkMode: boolean;
-};
 
 const toggles: { key: keyof Preferences; title: string; subtitle: string }[] = [
   { key: 'notifications', title: 'notifications', subtitle: 'crumbs from friends, weekly wrapped' },
@@ -25,12 +19,27 @@ const toggles: { key: keyof Preferences; title: string; subtitle: string }[] = [
 
 export default function Settings() {
   const [tab, setTab] = useState<SettingsTab>('general');
-  const [preferences, setPreferences] = useState<Preferences>({
+  const { data: currentUser } = useCurrentUser();
+  const { data: saved } = usePreferences();
+  // Local edits layered over what's saved, so toggles respond before the write lands.
+  // A failed write rolls its edit back.
+  const [edits, setEdits] = useState<Partial<Preferences>>({});
+  const preferences: Preferences = {
     notifications: true,
     locationServices: true,
     weeklyEmail: false,
     darkMode: false,
-  });
+    ...saved,
+    ...edits,
+  };
+
+  const setPreference = (key: keyof Preferences, value: boolean) => {
+    setEdits((current) => ({ ...current, [key]: value }));
+    updatePreferences({ [key]: value }).catch((error) => {
+      console.warn(error);
+      setEdits((current) => ({ ...current, [key]: !value }));
+    });
+  };
 
   return (
     <Screen topOffset={-14} paddingHorizontal={34} withTabBar={false}>
@@ -52,7 +61,7 @@ export default function Settings() {
 
       <View style={styles.identity}>
         <Avatar
-          photo={currentUser.avatar}
+          photo={currentUser?.avatar ?? emptyPhoto}
           size={108}
           badge={
             <Pressable
@@ -65,8 +74,8 @@ export default function Settings() {
             </Pressable>
           }
         />
-        <Text style={styles.name}>{currentUser.name}</Text>
-        <Text style={styles.handle}>{currentUser.handle}</Text>
+        <Text style={styles.name}>{currentUser?.name}</Text>
+        <Text style={styles.handle}>{currentUser?.handle}</Text>
       </View>
 
       {tab === 'general' ? (
@@ -87,7 +96,7 @@ export default function Settings() {
               trailing={
                 <Toggle
                   value={preferences[setting.key]}
-                  onValueChange={(value) => setPreferences((current) => ({ ...current, [setting.key]: value }))}
+                  onValueChange={(value) => setPreference(setting.key, value)}
                   accessibilityLabel={setting.title}
                 />
               }
@@ -126,7 +135,7 @@ export default function Settings() {
             trailing={
               <Toggle
                 value={preferences.locationServices}
-                onValueChange={(value) => setPreferences((current) => ({ ...current, locationServices: value }))}
+                onValueChange={(value) => setPreference('locationServices', value)}
                 accessibilityLabel="share my location"
               />
             }

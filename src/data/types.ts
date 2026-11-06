@@ -10,7 +10,8 @@ export type Crop = {
 };
 
 export type Photo = {
-  source: ImageSource;
+  /** null when the photo is missing or not yet uploaded. */
+  source: ImageSource | null;
   crop?: Crop;
 };
 
@@ -48,9 +49,12 @@ export type LinkedAccount = {
   connected: boolean;
 };
 
-export type FriendWeek = {
-  friendId: string;
-  cover: Photo;
+/** A friend with their crumb activity: total places and how many are from the last week. */
+export type FriendActivity = {
+  id: string;
+  name: string;
+  handle: string;
+  avatar: Photo;
   places: number;
   newPlaces: number;
 };
@@ -79,6 +83,7 @@ export type GallerySection = {
 export type Highlight = {
   id: string;
   friendId: string;
+  friendName: string;
   tag: string;
   date: string;
   photo: Photo;
