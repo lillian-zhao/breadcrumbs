@@ -74,6 +74,8 @@ export class MemoryStore implements DataStore {
       audience: data.audience ?? 'private',
       photoIds: data.photoIds ?? [],
       userId: data.userId,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
     });
     return this;
   }

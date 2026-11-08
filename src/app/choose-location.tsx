@@ -7,7 +7,7 @@ import { createCrumb, nearbyPlaces } from '@/data';
 import { usePlaceSearch } from '@/hooks/usePlaceSearch';
 import { colors, fonts, mapColors } from '@/theme';
 
-type Suggestion = { id: string; name: string; subtitle: string };
+type Suggestion = { id: string; name: string; subtitle: string; latitude?: number; longitude?: number };
 
 export default function ChooseLocation() {
   const [query, setQuery] = useState('Cafe');
@@ -19,6 +19,8 @@ export default function ChooseLocation() {
           id: place.id,
           name: place.name,
           subtitle: place.address || place.category,
+          latitude: place.latitude,
+          longitude: place.longitude,
         }))
       : nearbyPlaces.map((place) => ({ id: place.id, name: place.name, subtitle: place.subtitle }));
 
@@ -36,6 +38,8 @@ export default function ChooseLocation() {
         visitedAt: new Date(),
         note: null,
         audience: 'private',
+        latitude: selected.latitude ?? null,
+        longitude: selected.longitude ?? null,
       });
       router.back();
     } catch (error) {

@@ -49,6 +49,8 @@ function crumbDoc(id: string, d: Record<string, unknown>): CrumbData & { id: str
     note: (d.note as string | null | undefined) ?? (d.caption as string | null | undefined) ?? null,
     audience: (d.audience as CrumbData['audience'] | undefined) ?? (d.visibility as CrumbData['audience'] | undefined) ?? 'private',
     photoIds: (d.photoIds as string[] | undefined) ?? [],
+    latitude: (d.latitude as number | null | undefined) ?? null,
+    longitude: (d.longitude as number | null | undefined) ?? null,
   };
 }
 

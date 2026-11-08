@@ -7,7 +7,7 @@ import {
   type Relationship,
   type Resource,
 } from './permissions';
-import type { DataStore } from './store';
+import type { CrumbData, DataStore } from './store';
 import type {
   Album,
   Audience,
@@ -327,7 +327,16 @@ export function createApi(options: ApiOptions) {
     /** Create a crumb (one logged place visit) and return its id. */
     async create(
       actor: Actor,
-      input: { placeName: string; city: string; visitedAt: Date; note: string | null; audience: Audience; photoIds?: string[] },
+      input: {
+        placeName: string;
+        city: string;
+        visitedAt: Date;
+        note: string | null;
+        audience: Audience;
+        photoIds?: string[];
+        latitude?: number | null;
+        longitude?: number | null;
+      },
     ): Promise<string> {
       assert(actor, 'crumbs:write', { ownerId: actor.userId, relationship: 'self' });
       const id = 'crumb_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -339,8 +348,19 @@ export function createApi(options: ApiOptions) {
         note: input.note,
         audience: input.audience,
         photoIds: input.photoIds ?? [],
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
       });
       return id;
+    },
+
+    /** Raw crumbs of userId the actor is allowed to see (self = all, friend = shared). */
+    async list(actor: Actor, userId: UserId): Promise<(CrumbData & { id: string })[]> {
+      const rel = await relationship(actor, userId);
+      if (rel === 'self') return store.listCrumbs(userId);
+      if (rel === 'friend') return (await store.listCrumbs(userId)).filter((c) => c.audience === 'friends');
+      assert(actor, 'crumbs:read', { ownerId: userId, relationship: rel });
+      return [];
     },
 
     /** A single day's aggregated log, derived from that day's crumbs. */

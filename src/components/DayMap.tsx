@@ -1,7 +1,7 @@
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { Platform, StyleSheet, View } from 'react-native';
 
-import { getCrumbsForFriend, getPerson, nearbyFriendPins } from '@/data';
+import { getCrumbsForFriend, getPerson, nearbyFriendPins, useMyCrumbs } from '@/data';
 import { colors } from '@/theme';
 
 type Variant = 'mine' | 'friends' | 'friend';
@@ -20,15 +20,10 @@ type Pin = {
   longitude: number;
 };
 
-// Demo coordinates for the seeded places. Replace with real lat/lng once crumbs
-// store the geometry returned by Google Places.
 const PITTSBURGH = { latitude: 40.4406, longitude: -79.9959 };
 
+// Fallback demo coordinates for friend pins that don't carry lat/lng yet.
 const COORDINATES: Record<string, { latitude: number; longitude: number }> = {
-  cafe: { latitude: 40.4429, longitude: -79.9465 },
-  walk: { latitude: 40.4382, longitude: -79.9433 },
-  rooftop: { latitude: 40.4469, longitude: -80.0032 },
-  'park-cafe': { latitude: 40.4406, longitude: -79.9359 },
   'annie-aespa': { latitude: 40.447, longitude: -80.0032 },
   'alicia-park': { latitude: 40.4406, longitude: -79.9359 },
   'maggie-rooftop': { latitude: 40.4469, longitude: -80.0032 },
@@ -41,14 +36,18 @@ function coordinatesFor(id: string) {
 
 /** Real map (Apple Maps on iOS, Google Maps on Android) with crumb markers. */
 export function DayMap({ variant = 'mine', friendId, onSelectPin }: Props) {
+  const { data: myCrumbs = [] } = useMyCrumbs();
   const friendCrumbs = friendId ? getCrumbsForFriend(friendId) : [];
 
   let pins: Pin[] = [];
   if (variant === 'mine') {
-    pins = [
-      { id: 'cafe', title: 'Cafe', snippet: '10:30 am · 1 photo', ...coordinatesFor('cafe') },
-      { id: 'walk', title: 'Morning walk', snippet: '9:15 am · Lillian', ...coordinatesFor('walk') },
-    ];
+    pins = myCrumbs.map((crumb) => ({
+      id: crumb.id,
+      title: crumb.placeName,
+      snippet: crumb.city,
+      latitude: crumb.latitude,
+      longitude: crumb.longitude,
+    }));
   } else if (variant === 'friends') {
     pins = nearbyFriendPins.map((pin) => {
       const person = getPerson(pin.friendId);
@@ -56,7 +55,7 @@ export function DayMap({ variant = 'mine', friendId, onSelectPin }: Props) {
         id: pin.friendId,
         title: person ? person.name + ' · ' + pin.place : pin.place,
         snippet: pin.detail,
-        ...coordinatesFor(pin.friendId),
+        ...coordinatesFor(pin.crumbId),
       };
     });
   } else {
@@ -68,7 +67,9 @@ export function DayMap({ variant = 'mine', friendId, onSelectPin }: Props) {
     }));
   }
 
-  const cameraPosition = { coordinates: PITTSBURGH, zoom: 12 };
+  const first = pins[0];
+  const center = first ? { latitude: first.latitude, longitude: first.longitude } : PITTSBURGH;
+  const cameraPosition = { coordinates: center, zoom: 12 };
 
   if (Platform.OS === 'ios') {
     return (

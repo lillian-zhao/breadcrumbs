@@ -131,6 +131,34 @@ export function useRecentPhotos(limit = 4) {
   }, [userId, limit]);
 }
 
+export type MapCrumb = {
+  id: string;
+  placeName: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  visitedAt: Date;
+};
+
+/** The current user's crumbs that have map coordinates, newest first. */
+export function useMyCrumbs() {
+  const userId = useCurrentUserId();
+  return useAsync(async (): Promise<MapCrumb[]> => {
+    const crumbs = await api.crumbs.list(currentActor(), userId);
+    return crumbs
+      .filter((c) => c.latitude != null && c.longitude != null)
+      .sort((a, b) => b.visitedAt.getTime() - a.visitedAt.getTime())
+      .map((c) => ({
+        id: c.id,
+        placeName: c.placeName,
+        city: c.city,
+        latitude: c.latitude as number,
+        longitude: c.longitude as number,
+        visitedAt: c.visitedAt,
+      }));
+  }, [userId]);
+}
+
 export function useLoggedDays(year: number, month: number) {
   const userId = useCurrentUserId();
   return useAsync(() => api.crumbs.daysForMonth(currentActor(), userId, year, month), [userId, year, month]);
@@ -279,6 +307,8 @@ export function createCrumb(input: {
   note: string | null;
   audience: Audience;
   photoIds?: string[];
+  latitude?: number | null;
+  longitude?: number | null;
 }) {
   return api.crumbs.create(currentActor(), input);
 }

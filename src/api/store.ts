@@ -60,6 +60,8 @@ export interface CrumbData {
   note: string | null;
   audience: Audience;
   photoIds: string[];
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface PhotoData {
