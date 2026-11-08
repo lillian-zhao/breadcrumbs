@@ -1,10 +1,9 @@
 /**
- * Google Places API integration for place search.
+ * Google Places API (New) integration for place search.
  *
- * The key is read from EXPO_PUBLIC_GOOGLE_PLACES_API_KEY (set it in the
- * gitignored .env file). Expo inlines EXPO_PUBLIC_ variables into the client
- * bundle, so restrict the key to the Places API in Google Cloud and never
- * commit it.
+ * Uses the "Search Text" endpoint of the Places API (New). The key is read
+ * from EXPO_PUBLIC_GOOGLE_PLACES_API_KEY (set it in the gitignored .env file).
+ * Enable "Places API (New)" for that key in Google Cloud Console.
  */
 
 export type PlaceSearchResult = {
@@ -16,26 +15,25 @@ export type PlaceSearchResult = {
   category: string;
 };
 
-type RawResult = {
-  place_id?: string;
-  name?: string;
-  formatted_address?: string;
+type RawPlace = {
+  id?: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  location?: { latitude?: number; longitude?: number };
   types?: string[];
-  geometry?: { location?: { lat?: number; lng?: number } };
+  primaryType?: string;
 };
 
 type RawResponse = {
-  status?: string;
-  results?: RawResult[];
-  error_message?: string;
+  places?: RawPlace[];
+  error?: { message?: string };
 };
 
-function categoryLabel(types: string[] | undefined): string {
-  const raw = types && types.length > 0 ? types[0] : 'place';
-  return raw.replace(/_/g, ' ');
+function categoryLabel(value: string | undefined): string {
+  return (value ?? 'place').replace(/_/g, ' ');
 }
 
-/** Search places by free-text query via the Google Places Text Search API. */
+/** Search places by free-text query via the Places API (New) Search Text. */
 export async function searchPlaces(query: string): Promise<PlaceSearchResult[]> {
   const key = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
   if (!key) {
@@ -43,30 +41,37 @@ export async function searchPlaces(query: string): Promise<PlaceSearchResult[]> 
     return [];
   }
 
-  const url =
-    'https://maps.googleapis.com/maps/api/place/textsearch/json?query=' +
-    encodeURIComponent(query) +
-    '&key=' +
-    encodeURIComponent(key);
+  const fieldMask = 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.primaryType';
 
-  const response = await fetch(url);
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': key,
+      'X-Goog-FieldMask': fieldMask,
+    },
+    body: JSON.stringify({ textQuery: query }),
+  });
+
   if (!response.ok) {
-    throw new Error('Places API request failed with status ' + response.status);
+    let detail = await response.text().catch(() => '');
+    try {
+      const parsed = JSON.parse(detail) as { error?: { message?: string } };
+      if (parsed.error?.message) detail = parsed.error.message;
+    } catch {
+      // keep the raw body
+    }
+    throw new Error('Places API request failed: ' + detail);
   }
 
   const payload = (await response.json()) as RawResponse;
 
-  if (payload.status !== 'OK' && payload.status !== 'ZERO_RESULTS') {
-    const detail = payload.error_message ? ' - ' + payload.error_message : '';
-    throw new Error('Places API error: ' + (payload.status ?? 'UNKNOWN') + detail);
-  }
-
-  return (payload.results ?? []).map((result) => ({
-    id: result.place_id ?? '',
-    name: result.name ?? 'Unknown place',
-    address: result.formatted_address ?? '',
-    latitude: result.geometry?.location?.lat ?? 0,
-    longitude: result.geometry?.location?.lng ?? 0,
-    category: categoryLabel(result.types),
+  return (payload.places ?? []).map((place) => ({
+    id: place.id ?? '',
+    name: place.displayName?.text ?? 'Unknown place',
+    address: place.formattedAddress ?? '',
+    latitude: place.location?.latitude ?? 0,
+    longitude: place.location?.longitude ?? 0,
+    category: categoryLabel(place.primaryType ?? place.types?.[0]),
   }));
 }
