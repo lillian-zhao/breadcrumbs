@@ -18,7 +18,7 @@ const firebaseConfig = {
   projectId: 'breadcrumbs-bc286',
   storageBucket: 'breadcrumbs-bc286.firebasestorage.app',
   messagingSenderId: '314725980819',
-  appId: '1:314725980819:web:a69ebea64d66fcaf11cb66',
+  appId: '1:314725980819:web:7b47783b5907fb1011cb66',
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
