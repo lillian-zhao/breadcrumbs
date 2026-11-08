@@ -15,7 +15,7 @@ import {
   SectionHeading,
   TextField,
 } from '@/components/ui';
-import { createCrumb, currentUser, hasLoggedDay, todaysLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
+import { createCrumb, useCurrentUser, useDayLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
 import { colors, fonts } from '@/theme';
 
 const audienceHelp: Record<Audience, string> = {
@@ -25,7 +25,7 @@ const audienceHelp: Record<Audience, string> = {
 
 function stopDetail(stop: Stop) {
   const parts = [stop.time, stop.city];
-  if (stop.photoCount > 0) parts.push(`${stop.photoCount} photo${stop.photoCount === 1 ? '' : 's'}`);
+  if (stop.photoCount > 0) parts.push(stop.photoCount + ' photo' + (stop.photoCount === 1 ? '' : 's'));
   return parts.join(' · ');
 }
 
@@ -37,35 +37,39 @@ function FeaturedStop({ stop, photo }: { stop: Stop; photo: PhotoData }) {
         <Text style={styles.stopName}>{stop.name}</Text>
         <Text style={styles.caption}>{stopDetail(stop)}</Text>
       </View>
-      <Pill
-        label="Edit"
-        accessibilityLabel={`Edit ${stop.name}`}
-        onPress={() => router.push(`/edit-location?stop=${stop.id}` as Href)}
-      />
+      <Pill label="Edit" accessibilityLabel={'Edit ' + stop.name} onPress={() => router.push('/edit-location?stop=' + stop.id as Href)} />
     </View>
   );
 }
 
 export default function LogDay() {
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
-  const date = parseDayParam(dateParam) ?? todaysLog.date;
+  const date = parseDayParam(dateParam) ?? new Date();
   const fromCalendar = parseDayParam(dateParam) !== undefined;
-  const logged = hasLoggedDay(currentUser.id, date);
-  const isNew = fromCalendar && !logged;
-  const [composing, setComposing] = useState(!fromCalendar || logged);
-  const [note, setNote] = useState(isNew ? '' : todaysLog.note);
-  const [audience, setAudience] = useState<Audience>(todaysLog.audience);
-  const [featured, ...otherStops] = todaysLog.stops;
-  const attachedCount = todaysLog.photos.length;
-  const dayLabel = formatLoggedDay(date);
+  const { data: currentUser } = useCurrentUser();
+  const { data: dayLog, loading } = useDayLog(date);
+
+  const logged = dayLog != null;
+  const isNew = fromCalendar && !logged && !loading;
+  const [composing, setComposing] = useState(false);
+  const [noteEdit, setNoteEdit] = useState<string>();
+  const [audienceEdit, setAudienceEdit] = useState<Audience>();
   const [saving, setSaving] = useState(false);
+
+  const note = noteEdit ?? dayLog?.note ?? '';
+  const audience = audienceEdit ?? dayLog?.audience ?? 'private';
+  const stops = dayLog?.stops ?? [];
+  const [featured, ...otherStops] = stops;
+  const photos = dayLog?.photos ?? [];
+  const location = dayLog?.location ?? '';
+  const dayLabel = formatLoggedDay(date);
 
   const save = async () => {
     setSaving(true);
     try {
       await createCrumb({
         placeName: featured?.name ?? 'A little stop',
-        city: todaysLog.location || 'Pittsburgh',
+        city: location || 'Pittsburgh',
         visitedAt: date,
         note: note.trim() ? note.trim() : null,
         audience,
@@ -78,9 +82,9 @@ export default function LogDay() {
     }
   };
 
-  if (fromCalendar && !logged && !composing) {
+  if (isNew && !composing) {
     return (
-      <NoLogDay date={date} backLabel="Calendar" ownerName={currentUser.name} onCompose={() => setComposing(true)} />
+      <NoLogDay date={date} backLabel="Calendar" ownerName={currentUser?.name ?? 'You'} onCompose={() => setComposing(true)} />
     );
   }
 
@@ -94,7 +98,7 @@ export default function LogDay() {
           iconStyle: styles.returnIcon,
         }}
         title={{ title: 'Log a Day', fontSize: 44, lineHeight: 49.28 }}
-        subtitle={`${currentUser.name}’s crumbs · ${dayLabel}`}
+        subtitle={(currentUser?.name ?? 'You') + '’s crumbs · ' + dayLabel}
         style={styles.header}
       />
 
@@ -102,19 +106,19 @@ export default function LogDay() {
         <ListRow
           icon={require('@assets/icons/calendar-row.svg')}
           title={dayLabel}
-          subtitle={logged ? todaysLog.location : 'A new crumb for this date'}
+          subtitle={logged ? location : 'A new crumb for this date'}
           actionLabel="Change"
           onAction={() => {}}
         />
 
         <SectionHeading label="today’s stops" fontSize={19} ruleOpacity={0.6} />
-        {isNew ? (
+        {stops.length === 0 ? (
           <Card>
-            <Text style={styles.caption}>No stops yet. Add the first place for this day.</Text>
+            <Text style={styles.caption}>No stops yet. Add a location to start your trail.</Text>
           </Card>
         ) : (
           <Card>
-            {featured.photo && <FeaturedStop stop={featured} photo={featured.photo} />}
+            {featured && featured.photo && <FeaturedStop stop={featured} photo={featured.photo} />}
             {otherStops.map((stop) => (
               <ListRow
                 key={stop.id}
@@ -122,11 +126,12 @@ export default function LogDay() {
                 title={stop.name}
                 subtitle={stopDetail(stop)}
                 actionLabel="Edit"
-                onAction={() => router.push(`/edit-location?stop=${stop.id}` as Href)}
+                onAction={() => router.push('/edit-location?stop=' + stop.id as Href)}
               />
             ))}
           </Card>
         )}
+
         <Button
           label="Add location"
           variant="secondary"
@@ -135,7 +140,7 @@ export default function LogDay() {
         />
 
         <SectionHeading label="little moments" fontSize={19} ruleOpacity={0.6} />
-        {isNew ? (
+        {photos.length === 0 ? (
           <Button
             label="Add photo"
             variant="secondary"
@@ -144,7 +149,7 @@ export default function LogDay() {
           />
         ) : (
           <View style={styles.moments}>
-            <Photo photo={todaysLog.photos[0]} style={styles.momentPhoto} />
+            <Photo photo={photos[0]} style={styles.momentPhoto} />
             <View style={styles.photoAction}>
               <Button
                 label="Add photo"
@@ -153,7 +158,7 @@ export default function LogDay() {
                 onPress={() => router.push('/edit-photo' as Href)}
               />
               <Text style={styles.caption}>
-                {attachedCount} photo{attachedCount === 1 ? '' : 's'} attached · Preview to edit
+                {photos.length} photo{photos.length === 1 ? '' : 's'} attached · Preview to edit
               </Text>
             </View>
           </View>
@@ -162,7 +167,7 @@ export default function LogDay() {
         <TextField
           label="A note for this day"
           value={note}
-          onChangeText={setNote}
+          onChangeText={setNoteEdit}
           placeholder="What made today worth remembering?"
           helper="Your note stays with this day."
           multiline
@@ -175,14 +180,14 @@ export default function LogDay() {
             icon={require('@assets/icons/lock.svg')}
             tintIcons
             tone={audience === 'private' ? 'selected' : 'default'}
-            onPress={() => setAudience('private')}
+            onPress={() => setAudienceEdit('private')}
           />
           <Pill
             label="Friends"
             icon={require('@assets/icons/users.svg')}
             tintIcons
             tone={audience === 'friends' ? 'selected' : 'default'}
-            onPress={() => setAudience('friends')}
+            onPress={() => setAudienceEdit('friends')}
           />
         </View>
         <Text style={styles.caption}>{audienceHelp[audience]}</Text>
