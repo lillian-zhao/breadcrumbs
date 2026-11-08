@@ -1,4 +1,5 @@
-import { api, currentActor } from '@/api/client';
+import { getCurrentUserId, useAuthUser } from '@/api/auth';
+import { api } from '@/api/client';
 import type { FriendshipState, Preferences } from '@/api';
 import { useAsync } from '@/hooks/useAsync';
 
@@ -16,18 +17,26 @@ import type {
   User,
 } from './types';
 
-// API-backed reads for the screens. Each hook resolves Cloud Storage paths into
-// renderable Photos so components keep working with the UI types in ./types.
+type Actor = { userId: string };
 
-const me = currentActor;
+/** The currently signed-in actor. Falls back to an empty id when signed out. */
+function currentActor(): Actor {
+  return { userId: getCurrentUserId() ?? '' };
+}
+
+/** Subscribe to auth changes and return the current signed-in user id. */
+function useCurrentUserId(): string {
+  useAuthUser();
+  return getCurrentUserId() ?? '';
+}
 
 /** YYYY-MM-DD in the device's timezone, matching how the API groups crumbs into days. */
 export function dateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
-async function loadUser(userId: string): Promise<User | null> {
-  const result = await api.users.get(me, userId);
+async function loadUser(actor: Actor, userId: string): Promise<User | null> {
+  const result = await api.users.get(actor, userId);
   if (!result) return null;
   const { profile, stats } = result;
   return {
@@ -37,25 +46,29 @@ async function loadUser(userId: string): Promise<User | null> {
     bio: profile.bio,
     avatar: await resolvePhoto(profile.avatarPath),
     daysLogged: stats.daysLogged,
-    // Friendships are symmetric, so every friend both follows and is followed.
     followers: stats.friendCount,
     following: stats.friendCount,
   };
 }
 
 export function useCurrentUser() {
-  return useAsync(() => loadUser(me.userId), []);
+  const userId = useCurrentUserId();
+  return useAsync(() => loadUser(currentActor(), userId), [userId]);
 }
 
 export function useFriendProfile(friendId: string) {
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<{ friend: Friend | null; status: FriendshipState }> => {
-    const [friend, status] = await Promise.all([loadUser(friendId), api.friends.status(me, friendId)]);
+    const [friend, status] = await Promise.all([
+      loadUser(currentActor(), friendId),
+      api.friends.status(currentActor(), friendId),
+    ]);
     return { friend, status };
-  }, [friendId]);
+  }, [friendId, userId]);
 }
 
-async function loadFriends(): Promise<FriendActivity[]> {
-  const friends = await api.friends.list(me, me.userId);
+async function loadFriends(actor: Actor): Promise<FriendActivity[]> {
+  const friends = await api.friends.list(actor, actor.userId);
   return Promise.all(
     friends.map(async (friend) => ({
       id: friend.id,
@@ -69,12 +82,18 @@ async function loadFriends(): Promise<FriendActivity[]> {
 }
 
 export function useFriends() {
-  return useAsync(loadFriends, []);
+  const userId = useCurrentUserId();
+  return useAsync(() => loadFriends(currentActor()), [userId]);
 }
 
 export function useHighlights() {
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<Highlight[]> => {
-    const [highlights, friends] = await Promise.all([api.friends.highlights(me, me.userId), api.friends.list(me, me.userId)]);
+    const actor = currentActor();
+    const [highlights, friends] = await Promise.all([
+      api.friends.highlights(actor, actor.userId),
+      api.friends.list(actor, actor.userId),
+    ]);
     return Promise.all(
       highlights.map(async (highlight) => ({
         id: highlight.id,
@@ -85,24 +104,27 @@ export function useHighlights() {
         photo: await resolvePhoto(highlight.photo?.storagePath),
       })),
     );
-  }, []);
+  }, [userId]);
 }
 
 export function useRecentPhotos(limit = 4) {
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<Photo[]> => {
-    const photos = await api.crumbs.recentPhotos(me, me.userId, limit);
+    const photos = await api.crumbs.recentPhotos(currentActor(), userId, limit);
     return resolvePhotos(photos.map((photo) => photo.storagePath));
-  }, [limit]);
+  }, [userId, limit]);
 }
 
 export function useLoggedDays(year: number, month: number) {
-  return useAsync(() => api.crumbs.daysForMonth(me, me.userId, year, month), [year, month]);
+  const userId = useCurrentUserId();
+  return useAsync(() => api.crumbs.daysForMonth(currentActor(), userId, year, month), [userId, year, month]);
 }
 
 export function useDayLog(date: Date) {
   const key = dateKey(date);
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<DayLog | null> => {
-    const day = await api.crumbs.day(me, me.userId, key);
+    const day = await api.crumbs.day(currentActor(), userId, key);
     if (!day) return null;
     return {
       date,
@@ -121,12 +143,13 @@ export function useDayLog(date: Date) {
       note: day.note ?? '',
       audience: day.audience,
     };
-  }, [key]);
+  }, [key, userId]);
 }
 
 export function useSavedPlaces() {
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<SavedPlace[]> => {
-    const places = await api.places.saved(me, me.userId);
+    const places = await api.places.saved(currentActor(), userId);
     return Promise.all(
       places.map(async (place) => ({
         id: place.id,
@@ -136,12 +159,13 @@ export function useSavedPlaces() {
         photo: await resolvePhoto(place.photoPath),
       })),
     );
-  }, []);
+  }, [userId]);
 }
 
 export function useAlbums() {
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<Album[]> => {
-    const albums = await api.gallery.albums(me, me.userId);
+    const albums = await api.gallery.albums(currentActor(), userId);
     return Promise.all(
       albums.map(async (album) => ({
         id: album.id,
@@ -150,12 +174,13 @@ export function useAlbums() {
         cover: await resolvePhoto(album.coverPhotoPath),
       })),
     );
-  }, []);
+  }, [userId]);
 }
 
 export function useGallerySections() {
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<GallerySection[]> => {
-    const sections = await api.gallery.sections(me, me.userId);
+    const sections = await api.gallery.sections(currentActor(), userId);
     return Promise.all(
       sections.map(async (section) => ({
         id: section.id,
@@ -163,7 +188,7 @@ export function useGallerySections() {
         photos: await resolvePhotos(section.photos.map((photo) => photo.storagePath)),
       })),
     );
-  }, []);
+  }, [userId]);
 }
 
 const defaultPreferences: Preferences = {
@@ -174,7 +199,8 @@ const defaultPreferences: Preferences = {
 };
 
 export function usePreferences() {
-  return useAsync(async () => (await api.preferences.get(me, me.userId)) ?? defaultPreferences, []);
+  const userId = useCurrentUserId();
+  return useAsync(async () => (await api.preferences.get(currentActor(), userId)) ?? defaultPreferences, [userId]);
 }
 
 const providers: { id: string; name: string; connectedSubtitle: string; disconnectedSubtitle: string }[] = [
@@ -189,8 +215,9 @@ const providers: { id: string; name: string; connectedSubtitle: string; disconne
 ];
 
 export function useLinkedAccounts() {
+  const userId = useCurrentUserId();
   return useAsync(async (): Promise<LinkedAccount[]> => {
-    const accounts = await api.accounts.list(me, me.userId);
+    const accounts = await api.accounts.list(currentActor(), userId);
     return providers.map((provider) => {
       const connected = accounts.some((account) => account.provider === provider.id && account.connected);
       return {
@@ -200,31 +227,31 @@ export function useLinkedAccounts() {
         connected,
       };
     });
-  }, []);
+  }, [userId]);
 }
 
-// ---- writes ------------------------------------------------------------
+// ---- writes ----
 
 export function updateProfile(patch: { name?: string; handle?: string; bio?: string }) {
-  return api.users.update(me, patch);
+  return api.users.update(currentActor(), patch);
 }
 
 export function updatePreferences(patch: Partial<Preferences>) {
-  return api.preferences.update(me, patch);
+  return api.preferences.update(currentActor(), patch);
 }
 
 export function removeSavedPlace(placeId: string) {
-  return api.places.remove(me, placeId);
+  return api.places.remove(currentActor(), placeId);
 }
 
 export function requestFriend(friendId: string) {
-  return api.friends.request(me, friendId);
+  return api.friends.request(currentActor(), friendId);
 }
 
 export function acceptFriend(requesterId: string) {
-  return api.friends.accept(me, requesterId);
+  return api.friends.accept(currentActor(), requesterId);
 }
 
 export function unfriend(friendId: string) {
-  return api.friends.unfriend(me, friendId);
+  return api.friends.unfriend(currentActor(), friendId);
 }

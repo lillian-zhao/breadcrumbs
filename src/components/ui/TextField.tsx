@@ -18,6 +18,7 @@ type Props = {
   placeholder?: string;
   helper?: string;
   multiline?: boolean;
+  secureTextEntry?: boolean;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: TextInputProps['autoCapitalize'];
   autoComplete?: TextInputProps['autoComplete'];
@@ -34,6 +35,7 @@ export function TextField({
   placeholder,
   helper,
   multiline = false,
+  secureTextEntry,
   keyboardType,
   autoCapitalize,
   autoComplete,
@@ -51,6 +53,7 @@ export function TextField({
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         multiline={multiline}
+        secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}

@@ -6,34 +6,57 @@ import { useSession } from '@/session';
 import { colors, fonts, radii } from '@/theme';
 
 const keepsakes = [
-  {
-    caption: 'A little pick-me-up',
-    rotate: '-3deg',
-    photo: { source: require('@assets/photos/bubble-tea.png') },
-  },
-  {
-    caption: 'A sweet little day',
-    rotate: '3deg',
-    photo: { source: require('@assets/photos/dessert-cups.png') },
-  },
+  { caption: 'A little pick-me-up', rotate: '-3deg', photo: { source: require('@assets/photos/bubble-tea.png') } },
+  { caption: 'A sweet little day', rotate: '3deg', photo: { source: require('@assets/photos/dessert-cups.png') } },
 ] as const;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function authErrorMessage(reason: unknown): string {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  if (message.includes('auth/invalid-credential')) return 'Incorrect email or password.';
+  if (message.includes('auth/email-already-in-use')) return 'That email is already in use. Try signing in instead.';
+  if (message.includes('auth/weak-password')) return 'Password is too weak. Use at least 6 characters.';
+  if (message.includes('auth/invalid-email')) return 'That email address is not valid.';
+  if (message.includes('auth/network-request-failed')) return 'Network error. Check your connection and try again.';
+  if (message.includes('auth/too-many-requests')) return 'Too many attempts. Try again in a moment.';
+  return message;
+}
+
 export default function SignIn() {
-  const { signIn } = useSession();
+  const { signIn, signUp } = useSession();
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
 
-  const sendLink = () => {
-    if (!emailPattern.test(email.trim())) {
-      setError('Enter the email linked to your Crumbs account.');
-      setSent(false);
+  const submit = async () => {
+    const trimmedEmail = email.trim();
+    if (!emailPattern.test(trimmedEmail)) {
+      setError('Enter a valid email address.');
       return;
     }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (mode === 'signup' && !name.trim()) {
+      setError('Enter the name friends will see.');
+      return;
+    }
+
     setError(undefined);
-    setSent(true);
+    setSubmitting(true);
+    try {
+      if (mode === 'signup') await signUp(trimmedEmail, password, name.trim());
+      else await signIn(trimmedEmail, password);
+    } catch (reason) {
+      setError(authErrorMessage(reason));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -55,8 +78,22 @@ export default function SignIn() {
           ))}
         </View>
 
-        <Text style={styles.welcome}>Welcome back.</Text>
-        <Text style={styles.memories}>Your memories are right where you left them.</Text>
+        <Text style={styles.welcome}>{mode === 'signup' ? 'Join Crumbs.' : 'Welcome back.'}</Text>
+        <Text style={styles.memories}>
+          {mode === 'signup' ? 'Make an account to start your trail.' : 'Your memories are right where you left them.'}
+        </Text>
+
+        {mode === 'signup' && (
+          <TextField
+            label="Name"
+            value={name}
+            onChangeText={(value) => {
+              setName(value);
+              setError(undefined);
+            }}
+            placeholder="Your name"
+          />
+        )}
 
         <TextField
           label="Email address"
@@ -64,10 +101,8 @@ export default function SignIn() {
           onChangeText={(value) => {
             setEmail(value);
             setError(undefined);
-            setSent(false);
           }}
           placeholder="you@example.com"
-          helper={error ?? 'Use the email linked to your Crumbs account.'}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -75,26 +110,37 @@ export default function SignIn() {
           textContentType="emailAddress"
         />
 
-        <Button label="Email me a sign-in link" onPress={sendLink} />
-
-        <StatusMessage
-          icon={require('@assets/icons/info.svg')}
-          title={sent ? 'We sent a sign-in link' : 'Check your inbox after sending'}
-          body={
-            sent
-              ? `Open the link sent to ${email.trim()} to continue. For this preview, you can open it here.`
-              : 'The secure link signs you in without a password. If it doesn’t arrive, check spam or send a new link.'
-          }
+        <TextField
+          label="Password"
+          value={password}
+          onChangeText={(value) => {
+            setPassword(value);
+            setError(undefined);
+          }}
+          placeholder="At least 6 characters"
+          secureTextEntry
+          textContentType={mode === 'signup' ? 'newPassword' : 'password'}
         />
 
-        {sent && <Button label="Open link to continue" onPress={signIn} />}
+        {error && (
+          <StatusMessage icon={require('@assets/icons/info.svg')} title="Could not continue" body={error} />
+        )}
 
-        <SectionHeading label="or return with" fontSize={19} ruleOpacity={0.6} />
-        <Button label="Continue with Google ↗" variant="secondary" onPress={signIn} />
-        <Button label="Continue with Apple ↗" variant="secondary" onPress={signIn} />
+        <Button label={submitting ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'} onPress={submitting ? undefined : submit} />
+
+        <SectionHeading label="or" fontSize={19} ruleOpacity={0.6} />
+        <Button
+          label={mode === 'signup' ? 'I already have an account' : 'New here? Create an account'}
+          variant="secondary"
+          onPress={() => {
+            setMode(mode === 'signup' ? 'signin' : 'signup');
+            setError(undefined);
+          }}
+        />
         <Caption>
-          Google and Apple open a secure sign-in handoff. Return with your existing account to find your Profile and
-          saved crumbs.
+          {mode === 'signup'
+            ? 'Creating an account stores your profile, crumbs and saved places in your Firebase account.'
+            : 'Google and Apple sign-in will be added once those providers are configured.'}
         </Caption>
       </View>
     </Screen>
