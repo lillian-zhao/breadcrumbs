@@ -4,7 +4,6 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { toDayParam } from '@/components/calendar';
 import { ProfileCalendar } from '@/components/ProfileCalendar';
-import { useConnections } from '@/connections';
 import {
   ActionCard,
   Avatar,
@@ -18,47 +17,70 @@ import {
   Screen,
   SectionHeading,
 } from '@/components/ui';
+import type { FriendshipState } from '@/api';
 import {
+  acceptFriend,
   countLoggedDays,
-  friendsOfFriends,
-  getPerson,
   getShadedDays,
   getSharedPlaces,
-  mutualLabel,
+  requestFriend,
   today,
+  unfriend,
+  useFriendProfile,
 } from '@/data';
 import { colors, fonts } from '@/theme';
 
+/** The follow pill for each relationship; null hides it. */
+function followAction(status: FriendshipState | undefined, friendId: string) {
+  if (!status) return null;
+  switch (status.kind) {
+    case 'accepted':
+      return { label: 'Following', selected: true, run: () => unfriend(friendId) };
+    case 'pending':
+      return status.direction === 'incoming'
+        ? { label: 'Accept', selected: false, run: () => acceptFriend(friendId) }
+        : { label: 'Requested', selected: true, run: undefined };
+    case 'none':
+      return { label: 'Follow', selected: false, run: () => requestFriend(friendId) };
+    default:
+      return null;
+  }
+}
+
 export default function FriendProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const friendId = Array.isArray(id) ? id[0] : id;
-  const friend = friendId ? getPerson(friendId) : undefined;
-  const suggestion = friendsOfFriends.find((item) => item.id === friend?.id);
-  const { isFollowing, toggleFollow } = useConnections();
-  const following = friend ? isFollowing(friend.id) : false;
+  const friendId = (Array.isArray(id) ? id[0] : id) ?? '';
+  const { data, loading, reload } = useFriendProfile(friendId);
   const [visibleMonth, setVisibleMonth] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const places = friend ? getSharedPlaces(friend.id) : [];
-  const daysShared = friend ? countLoggedDays(friend.id, visibleMonth.year) : 0;
+  const [saving, setSaving] = useState(false);
+
+  const friend = data?.friend;
+  const status = data?.status;
+  const isFriend = status?.kind === 'accepted';
+  const follow = followAction(status, friendId);
+  const runFollow = follow?.run;
+
+  if (!friend) {
+    return (
+      <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
+        <BackButton label="Friends" />
+        <Caption>{loading ? 'Loading…' : 'That person isn’t in your circle yet.'}</Caption>
+      </Screen>
+    );
+  }
+
+  const places = getSharedPlaces(friend.id);
+  const daysShared = countLoggedDays(friend.id, visibleMonth.year);
+  const stats = [
+    { value: daysShared, label: 'days shared' },
+    { value: places.length, label: 'saved spots' },
+  ];
 
   const shiftMonth = (delta: number) =>
     setVisibleMonth(({ year, month }) => {
       const next = new Date(year, month + delta, 1);
       return { year: next.getFullYear(), month: next.getMonth() };
     });
-
-  if (!friend) {
-    return (
-      <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
-        <BackButton />
-        <Caption>That person isn’t in your circle yet.</Caption>
-      </Screen>
-    );
-  }
-
-  const stats = [
-    { value: daysShared, label: 'days shared' },
-    { value: places.length, label: 'saved spots' },
-  ];
 
   return (
     <Screen topOffset={20} contentWidth={354} withTabBar={false}>
@@ -68,17 +90,31 @@ export default function FriendProfile() {
       <View style={styles.profileHeader}>
         <Avatar photo={friend.avatar} size={116} />
         <Text style={styles.name}>{friend.name}</Text>
-        <Pill
-          label={following ? 'Following' : 'Follow'}
-          icon={following ? require('@assets/icons/check.svg') : undefined}
-          tintIcons
-          tone={following ? 'selected' : 'default'}
-          onPress={() => toggleFollow(friend.id)}
-        />
-        {following && (
+        {follow && (
+          <Pill
+            label={follow.label}
+            icon={follow.selected ? require('@assets/icons/check.svg') : undefined}
+            tintIcons
+            tone={follow.selected ? 'selected' : 'default'}
+            onPress={
+              runFollow && !saving
+                ? () => {
+                    setSaving(true);
+                    runFollow()
+                      .catch(console.warn)
+                      .finally(() => {
+                        setSaving(false);
+                        reload();
+                      });
+                  }
+                : undefined
+            }
+          />
+        )}
+        {isFriend && (
           <View style={styles.stats}>
             {stats.flatMap((stat, index) => [
-              index > 0 && <View key={`${stat.label}-divider`} style={styles.statDivider} />,
+              index > 0 && <View key={stat.label + '-divider'} style={styles.statDivider} />,
               <View key={stat.label} style={styles.stat}>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
@@ -88,30 +124,29 @@ export default function FriendProfile() {
         )}
       </View>
 
-      {!following && (
+      {!isFriend && (
         <Card style={styles.inset}>
           {!!friend.bio && <Text style={styles.bio}>{friend.bio}</Text>}
-          {suggestion && <Caption>{mutualLabel(suggestion.via)}</Caption>}
           <Caption>Follow {friend.name} to see the crumbs they share with friends.</Caption>
         </Card>
       )}
 
-      {following && (
+      {isFriend && (
         <>
           <View style={styles.actionCards}>
             <ActionCard
               icon={require('@assets/icons/map-pin-card.svg')}
               title="Saved spots"
-              subtitle={`Places ${friend.name} shares`}
+              subtitle={'Places ' + friend.name + ' shares'}
               color={colors.bark}
-              href={`/friend-places/${friend.id}` as Href}
+              href={'/friend-places/' + friend.id as Href}
             />
             <ActionCard
               icon={require('@assets/icons/plus-circle.svg')}
               title="Their week"
               subtitle="A shared recap"
               color={colors.crumb}
-              href={`/wrapped?friend=${friend.id}` as Href}
+              href={'/wrapped?friend=' + friend.id as Href}
             />
           </View>
 
@@ -122,17 +157,12 @@ export default function FriendProfile() {
             today={today}
             shadedDays={getShadedDays(friend.id, visibleMonth.year, visibleMonth.month)}
             onShiftMonth={shiftMonth}
-            onSelectDay={(date) => router.push(`/journal/${friend.id}?date=${toDayParam(date)}` as Href)}
+            onSelectDay={(date) => router.push('/journal/' + friend.id + '?date=' + toDayParam(date) as Href)}
           />
 
           <Divider tone="toast" style={styles.calendarDivider} />
 
-          <SectionHeading
-            label="saved locations"
-            gap={9}
-            labelInset={5}
-            style={[styles.inset, styles.sectionHeading]}
-          />
+          <SectionHeading label="saved locations" gap={9} labelInset={5} style={[styles.inset, styles.sectionHeading]} />
           <View style={styles.tileRow}>
             {places.map((place) => (
               <PhotoCard
@@ -140,12 +170,12 @@ export default function FriendProfile() {
                 variant="stacked"
                 photo={place.photo}
                 title={place.name}
-                subtitle={`${place.category} • ${place.price}`}
+                subtitle={place.category + ' • ' + place.price}
                 size={{ width: 110, height: 130, photoHeight: 80 }}
                 labelColor={colors.bark}
                 titleSize={13}
                 labelPadding={8}
-                onPress={() => router.push(`/place/${place.id}` as Href)}
+                onPress={() => router.push('/place/' + place.id as Href)}
               />
             ))}
           </View>

@@ -15,41 +15,37 @@ import {
   SectionHeading,
   TitleRow,
 } from '@/components/ui';
-import {
-  featuredFriendIds,
-  friendsOfFriends,
-  getFriend,
-  getPerson,
-  highlights,
-  matchesPersonQuery,
-  mutualLabel,
-} from '@/data';
+import { friendsOfFriends, getPerson, mutualLabel, useFriends, useHighlights } from '@/data';
 import { colors, fonts } from '@/theme';
 
-const featuredFriends = featuredFriendIds.map(getFriend);
+function matchesFriend(friend: { name: string; handle: string }, query: string) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return friend.name.toLowerCase().includes(needle) || friend.handle.toLowerCase().includes(needle);
+}
 
 export default function Friends() {
-  const [selectedFriendId, setSelectedFriendId] = useState(featuredFriends[0].id);
+  const { data: friends = [] } = useFriends();
+  const { data: highlights = [] } = useHighlights();
+  const [selectedFriendId, setSelectedFriendId] = useState<string>();
   const [query, setQuery] = useState('');
   const { isFollowing, toggleFollow } = useConnections();
 
+  const selectedId = selectedFriendId ?? friends[0]?.id;
+
   const visibleFriends = useMemo(
-    () => featuredFriends.filter((friend) => matchesPersonQuery(friend, query)),
-    [query],
+    () => friends.filter((friend) => matchesFriend(friend, query)),
+    [friends, query],
   );
   const visibleHighlights = useMemo(
-    () =>
-      highlights.filter((highlight) => {
-        const friend = getPerson(highlight.friendId);
-        return friend ? matchesPersonQuery(friend, query) : false;
-      }),
-    [query],
+    () => highlights.filter((highlight) => matchesFriend({ name: highlight.friendName ?? '', handle: '' }, query)),
+    [highlights, query],
   );
   const suggestedFriends = useMemo(
     () =>
       friendsOfFriends.filter((suggestion) => {
         const person = getPerson(suggestion.id);
-        return person && !isFollowing(person.id) && matchesPersonQuery(person, query);
+        return person && !isFollowing(person.id) && matchesFriend(person, query);
       }),
     [isFollowing, query],
   );
@@ -64,14 +60,14 @@ export default function Friends() {
         {visibleFriends.length > 0 && (
           <View style={styles.friendSelector}>
             {visibleFriends.map((friend) => {
-              const isSelected = friend.id === selectedFriendId;
+              const isSelected = friend.id === selectedId;
               return (
                 <Pressable
                   key={friend.id}
                   style={styles.friend}
                   onPress={() => {
                     setSelectedFriendId(friend.id);
-                    router.push(`/friend/${friend.id}` as Href);
+                    router.push('/friend/' + friend.id as Href);
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isSelected }}
@@ -118,7 +114,7 @@ export default function Friends() {
                   actionLabel={isFollowing(person.id) ? 'Following' : 'Follow'}
                   actionSelected={isFollowing(person.id)}
                   onAction={() => toggleFollow(person.id)}
-                  onPress={() => router.push(`/friend/${person.id}` as Href)}
+                  onPress={() => router.push('/friend/' + person.id as Href)}
                 />
               );
             })}
@@ -129,10 +125,10 @@ export default function Friends() {
           <Pressable
             key={highlight.id}
             style={styles.highlight}
-            onPress={() => router.push(`/crumb/${highlight.id}` as Href)}
+            onPress={() => router.push('/crumb/' + highlight.id as Href)}
             accessibilityRole="button"
           >
-            <Text style={styles.highlightTitle}>{getFriend(highlight.friendId).name}’s recent highlight</Text>
+            <Text style={styles.highlightTitle}>{highlight.friendName ?? 'A friend'}’s recent highlight</Text>
             <View style={styles.highlightDetails}>
               <View style={styles.tags}>
                 <Pill label={highlight.tag} size="tag" tone="toast" />
