@@ -15,7 +15,7 @@ import {
   SectionHeading,
   TitleRow,
 } from '@/components/ui';
-import { friendsOfFriends, getPerson, mutualLabel, useFriends, useHighlights } from '@/data';
+import { friendsOfFriends, getPerson, mutualLabel, useFriends, useHighlights, usePeopleSearch } from '@/data';
 import { colors, fonts } from '@/theme';
 
 function matchesFriend(friend: { name: string; handle: string }, query: string) {
@@ -27,10 +27,12 @@ function matchesFriend(friend: { name: string; handle: string }, query: string) 
 export default function Friends() {
   const { data: friends = [] } = useFriends();
   const { data: highlights = [] } = useHighlights();
-  const [selectedFriendId, setSelectedFriendId] = useState<string>();
   const [query, setQuery] = useState('');
-  const { isFollowing, toggleFollow } = useConnections();
+  const { data: peopleResults = [] } = usePeopleSearch(query);
+  const [selectedFriendId, setSelectedFriendId] = useState<string>();
+  const { isFollowing, isRequested, toggleFollow } = useConnections();
 
+  const searching = query.trim().length > 0;
   const selectedId = selectedFriendId ?? friends[0]?.id;
 
   const visibleFriends = useMemo(
@@ -57,96 +59,111 @@ export default function Friends() {
       <View style={styles.feed}>
         <SearchField value={query} onChangeText={setQuery} placeholder="Search friends" />
 
-        {visibleFriends.length > 0 && (
-          <View style={styles.friendSelector}>
-            {visibleFriends.map((friend) => {
-              const isSelected = friend.id === selectedId;
-              return (
-                <Pressable
-                  key={friend.id}
-                  style={styles.friend}
-                  onPress={() => {
-                    setSelectedFriendId(friend.id);
-                    router.push('/friend/' + friend.id as Href);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                >
-                  <Avatar photo={friend.avatar} size={64} ringColor={isSelected ? colors.crumb : colors.sand} />
-                  <Text style={[styles.friendName, isSelected && styles.friendNameSelected]}>{friend.name}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-
-        <Button
-          label="Find people"
-          variant="secondary"
-          trailingIcon={require('@assets/icons/arrow-cta.svg')}
-          trailingIconSize={{ width: 13.332, height: 12.327 }}
-          onPress={() => router.push('/people' as Href)}
-        />
-
-        <Divider />
-
-        <Button
-          label="Check out where your friends recommend"
-          size="lg"
-          trailingIcon={require('@assets/icons/arrow-cta.svg')}
-          trailingIconSize={{ width: 13.332, height: 12.327 }}
-          onPress={() => router.push('/recommend' as Href)}
-          style={styles.recommendations}
-        />
-
-        {suggestedFriends.length > 0 && (
-          <View style={styles.suggestions}>
-            <SectionHeading label="friends of friends" fontSize={19} ruleOpacity={0.6} />
-            {suggestedFriends.map((suggestion) => {
-              const person = getPerson(suggestion.id);
-              if (!person) return null;
-              return (
+        {searching ? (
+          <>
+            <SectionHeading label="people" fontSize={19} ruleOpacity={0.6} />
+            {peopleResults.length === 0 ? (
+              <Text style={styles.empty}>No one matches “{query.trim()}”.</Text>
+            ) : (
+              peopleResults.map((person) => (
                 <PersonRow
                   key={person.id}
                   name={person.name}
-                  subtitle={mutualLabel(suggestion.via)}
+                  subtitle={person.handle}
                   photo={person.avatar}
-                  actionLabel={isFollowing(person.id) ? 'Following' : 'Follow'}
-                  actionSelected={isFollowing(person.id)}
-                  onAction={() => toggleFollow(person.id)}
+                  actionLabel={isFollowing(person.id) ? 'Following' : isRequested(person.id) ? 'Requested' : 'Follow'}
+                  actionSelected={isFollowing(person.id) || isRequested(person.id)}
+                  onAction={isRequested(person.id) ? undefined : () => toggleFollow(person.id)}
                   onPress={() => router.push('/friend/' + person.id as Href)}
                 />
-              );
-            })}
-          </View>
-        )}
-
-        {visibleHighlights.map((highlight) => (
-          <Pressable
-            key={highlight.id}
-            style={styles.highlight}
-            onPress={() => router.push('/crumb/' + highlight.id as Href)}
-            accessibilityRole="button"
-          >
-            <Text style={styles.highlightTitle}>{highlight.friendName ?? 'A friend'}’s recent highlight</Text>
-            <View style={styles.highlightDetails}>
-              <View style={styles.tags}>
-                <Pill label={highlight.tag} size="tag" tone="toast" />
-                <Pill label={highlight.date} size="tag" tone="outline" />
+              ))
+            )}
+          </>
+        ) : (
+          <>
+            {visibleFriends.length > 0 && (
+              <View style={styles.friendSelector}>
+                {visibleFriends.map((friend) => {
+                  const isSelected = friend.id === selectedId;
+                  return (
+                    <Pressable
+                      key={friend.id}
+                      style={styles.friend}
+                      onPress={() => {
+                        setSelectedFriendId(friend.id);
+                        router.push('/friend/' + friend.id as Href);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                    >
+                      <Avatar photo={friend.avatar} size={64} ringColor={isSelected ? colors.crumb : colors.sand} />
+                      <Text style={[styles.friendName, isSelected && styles.friendNameSelected]}>{friend.name}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-              <Pill
-                label="crumbs"
-                size="action"
-                tone="plain"
-                trailingIcon={require('@assets/icons/arrow-up-right.svg')}
-              />
-            </View>
-            <Photo photo={highlight.photo} style={styles.highlightPhoto} />
-          </Pressable>
-        ))}
+            )}
 
-        {query.trim().length > 0 && visibleFriends.length === 0 && suggestedFriends.length === 0 && visibleHighlights.length === 0 && (
-          <Text style={styles.empty}>No friends match “{query.trim()}”.</Text>
+            <Button
+              label="Find people"
+              variant="secondary"
+              trailingIcon={require('@assets/icons/arrow-cta.svg')}
+              trailingIconSize={{ width: 13.332, height: 12.327 }}
+              onPress={() => router.push('/people' as Href)}
+            />
+
+            <Divider />
+
+            <Button
+              label="Check out where your friends recommend"
+              size="lg"
+              trailingIcon={require('@assets/icons/arrow-cta.svg')}
+              trailingIconSize={{ width: 13.332, height: 12.327 }}
+              onPress={() => router.push('/recommend' as Href)}
+              style={styles.recommendations}
+            />
+
+            {suggestedFriends.length > 0 && (
+              <View style={styles.suggestions}>
+                <SectionHeading label="friends of friends" fontSize={19} ruleOpacity={0.6} />
+                {suggestedFriends.map((suggestion) => {
+                  const person = getPerson(suggestion.id);
+                  if (!person) return null;
+                  return (
+                    <PersonRow
+                      key={person.id}
+                      name={person.name}
+                      subtitle={mutualLabel(suggestion.via)}
+                      photo={person.avatar}
+                      actionLabel={isFollowing(person.id) ? 'Following' : isRequested(person.id) ? 'Requested' : 'Follow'}
+                      actionSelected={isFollowing(person.id) || isRequested(person.id)}
+                      onAction={isRequested(person.id) ? undefined : () => toggleFollow(person.id)}
+                      onPress={() => router.push('/friend/' + person.id as Href)}
+                    />
+                  );
+                })}
+              </View>
+            )}
+
+            {visibleHighlights.map((highlight) => (
+              <Pressable
+                key={highlight.id}
+                style={styles.highlight}
+                onPress={() => router.push('/crumb/' + highlight.id as Href)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.highlightTitle}>{highlight.friendName ?? 'A friend'}’s recent highlight</Text>
+                <View style={styles.highlightDetails}>
+                  <View style={styles.tags}>
+                    <Pill label={highlight.tag} size="tag" tone="toast" />
+                    <Pill label={highlight.date} size="tag" tone="outline" />
+                  </View>
+                  <Pill label="crumbs" size="action" tone="plain" trailingIcon={require('@assets/icons/arrow-up-right.svg')} />
+                </View>
+                <Photo photo={highlight.photo} style={styles.highlightPhoto} />
+              </Pressable>
+            ))}
+          </>
         )}
       </View>
     </Screen>

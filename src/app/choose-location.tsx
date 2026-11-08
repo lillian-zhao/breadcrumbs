@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Button, Caption, Card, ListRow, PageHeader, Pill, Screen, SearchField, SectionHeading } from '@/components/ui';
-import { nearbyPlaces } from '@/data';
+import { createCrumb, nearbyPlaces } from '@/data';
 import { usePlaceSearch } from '@/hooks/usePlaceSearch';
 import { colors, fonts, mapColors } from '@/theme';
 
@@ -24,6 +24,26 @@ export default function ChooseLocation() {
 
   const [selectedId, setSelectedId] = useState<string>(nearbyPlaces[0].id);
   const selected = suggestions.find((s) => s.id === selectedId) ?? suggestions[0];
+  const [saving, setSaving] = useState(false);
+
+  const confirm = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await createCrumb({
+        placeName: selected.name,
+        city: 'Pittsburgh',
+        visitedAt: new Date(),
+        note: null,
+        audience: 'private',
+      });
+      router.back();
+    } catch (error) {
+      console.warn(error);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
@@ -75,7 +95,7 @@ export default function ChooseLocation() {
         <Caption>Not the right spot? Search a place name to refine nearby results.</Caption>
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
-          <Button label={selected ? 'Confirm ' + selected.name : 'Confirm'} fill onPress={() => router.back()} />
+          <Button label={saving ? 'Saving…' : selected ? 'Confirm ' + selected.name : 'Confirm'} fill onPress={saving ? undefined : confirm} />
         </View>
       </View>
     </Screen>

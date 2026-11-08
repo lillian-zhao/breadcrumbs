@@ -6,7 +6,9 @@ import { useAsync } from '@/hooks/useAsync';
 
 type Connections = {
   followingIds: ReadonlySet<string>;
+  requestedIds: ReadonlySet<string>;
   isFollowing: (id: string) => boolean;
+  isRequested: (id: string) => boolean;
   follow: (id: string) => Promise<void>;
   unfollow: (id: string) => Promise<void>;
   toggleFollow: (id: string) => Promise<void>;
@@ -14,17 +16,28 @@ type Connections = {
 
 const ConnectionsContext = createContext<Connections | null>(null);
 
-/** Accepted friends of the signed-in user, backed by Firestore friendships. */
+/** Accepted friends and outgoing requests of the signed-in user, backed by Firestore. */
 export function ConnectionsProvider({ children }: PropsWithChildren) {
   useAuthUser();
   const userId = getCurrentUserId() ?? '';
 
-  const { data: friends = [], reload } = useAsync(
-    async () => (userId ? api.friends.list({ userId }, userId) : []),
+  const { data, reload } = useAsync(
+    async () => {
+      if (!userId) return { following: [] as string[], requested: [] as string[] };
+      const [friends, outgoing] = await Promise.all([
+        api.friends.list({ userId }, userId),
+        api.friends.outgoing(userId),
+      ]);
+      return {
+        following: friends.map((friend) => friend.id),
+        requested: outgoing.map((req) => req.userId),
+      };
+    },
     [userId],
   );
 
-  const followingIds = useMemo(() => new Set(friends.map((friend) => friend.id)), [friends]);
+  const followingIds = useMemo(() => new Set(data?.following ?? []), [data]);
+  const requestedIds = useMemo(() => new Set(data?.requested ?? []), [data]);
 
   const follow = useCallback(
     async (id: string) => {
@@ -55,12 +68,14 @@ export function ConnectionsProvider({ children }: PropsWithChildren) {
   const value = useMemo<Connections>(
     () => ({
       followingIds,
+      requestedIds,
       isFollowing: (id) => followingIds.has(id),
+      isRequested: (id) => requestedIds.has(id),
       follow,
       unfollow,
       toggleFollow,
     }),
-    [followingIds, follow, unfollow, toggleFollow],
+    [followingIds, requestedIds, follow, unfollow, toggleFollow],
   );
 
   return <ConnectionsContext.Provider value={value}>{children}</ConnectionsContext.Provider>;

@@ -36,7 +36,7 @@ export default function People() {
   const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<PeopleTab>(() => asTab(tabParam));
   const [query, setQuery] = useState('');
-  const { isFollowing, toggleFollow, followingIds } = useConnections();
+  const { isFollowing, isRequested, toggleFollow, followingIds } = useConnections();
 
   const followers = useMemo(
     () => followerIds.map(getPerson).filter((person) => person && matchesPersonQuery(person, query)),
@@ -113,9 +113,9 @@ export default function People() {
                         : person.handle
                   }
                   photo={person.avatar}
-                  actionLabel={isFollowing(person.id) ? 'Following' : 'Follow'}
-                  actionSelected={isFollowing(person.id)}
-                  onAction={() => toggleFollow(person.id)}
+                  actionLabel={isFollowing(person.id) ? 'Following' : isRequested(person.id) ? 'Requested' : 'Follow'}
+                  actionSelected={isFollowing(person.id) || isRequested(person.id)}
+                  onAction={isRequested(person.id) ? undefined : () => toggleFollow(person.id)}
                   onPress={() => router.push(`/friend/${person.id}` as Href)}
                 />
               ))
@@ -134,9 +134,9 @@ export default function People() {
                       tab === 'followers' ? `${person.handle} · Follows you` : `${person.handle} · Following`
                     }
                     photo={person.avatar}
-                    actionLabel={isFollowing(person.id) ? 'Following' : 'Follow'}
-                    actionSelected={isFollowing(person.id)}
-                    onAction={() => toggleFollow(person.id)}
+                    actionLabel={isFollowing(person.id) ? 'Following' : isRequested(person.id) ? 'Requested' : 'Follow'}
+                    actionSelected={isFollowing(person.id) || isRequested(person.id)}
+                    onAction={isRequested(person.id) ? undefined : () => toggleFollow(person.id)}
                     onPress={() => router.push(`/friend/${person.id}` as Href)}
                   />
                 ),
@@ -167,9 +167,9 @@ export default function People() {
                   name={person.name}
                   subtitle={`${person.handle} · ${mutualLabel(suggestion.via)}`}
                   photo={person.avatar}
-                  actionLabel={isFollowing(person.id) ? 'Following' : 'Follow'}
-                  actionSelected={isFollowing(person.id)}
-                  onAction={() => toggleFollow(person.id)}
+                  actionLabel={isFollowing(person.id) ? 'Following' : isRequested(person.id) ? 'Requested' : 'Follow'}
+                  actionSelected={isFollowing(person.id) || isRequested(person.id)}
+                  onAction={isRequested(person.id) ? undefined : () => toggleFollow(person.id)}
                   onPress={() => router.push(`/friend/${person.id}` as Href)}
                 />
               );
@@ -186,9 +186,9 @@ export default function People() {
                 name={person.name}
                 subtitle={person.handle}
                 photo={person.avatar}
-                actionLabel={isFollowing(person.id) ? 'Following' : 'Follow'}
-                actionSelected={isFollowing(person.id)}
-                onAction={() => toggleFollow(person.id)}
+                actionLabel={isFollowing(person.id) ? 'Following' : isRequested(person.id) ? 'Requested' : 'Follow'}
+                actionSelected={isFollowing(person.id) || isRequested(person.id)}
+                onAction={isRequested(person.id) ? undefined : () => toggleFollow(person.id)}
                 onPress={() => router.push(`/friend/${person.id}` as Href)}
               />
             ))}

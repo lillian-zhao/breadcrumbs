@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Seed demo data into Breadcrumbs Firestore, or list existing users.
+ * Seed demo data into Breadcrumbs Firestore + Auth, or list existing users.
  * Requires firebase-admin (dev dependency) and a service-account key.
  *
  *   GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json node scripts/seed.js
@@ -30,6 +30,29 @@ initializeApp({
 const db = getFirestore();
 const auth = getAuth();
 
+const DEMO_PASSWORD = 'demo123456';
+
+const users = {
+  lillian: { name: 'Lillian', handle: '@lillian', bio: 'Little stops, good food.', email: 'lillian@example.com' },
+  annie: { name: 'Annie', handle: '@annie', bio: 'Little stops, good company.', email: 'annie@example.com' },
+  alicia: { name: 'Alicia', handle: '@alicia', bio: 'Coffee, clay, and a slow Saturday.', email: 'alicia@example.com' },
+  tongtong: { name: 'Tongtong', handle: '@tongtong', bio: 'Late lights and leftover songs.', email: 'tongtong@example.com' },
+  maggie: { name: 'Maggie', handle: '@maggie', bio: 'Kitchens, colors, and a shelf.', email: 'maggie@example.com' },
+};
+
+async function ensureAuthUser(uid, email, password, name) {
+  try {
+    await auth.createUser({ uid, email, password, displayName: name });
+    return 'created';
+  } catch (err) {
+    if (err.code === 'auth/uid-already-exists' || err.code === 'auth/email-already-exists') {
+      await auth.updateUser(uid, { email, password });
+      return 'updated';
+    }
+    throw err;
+  }
+}
+
 async function listUsers() {
   const snap = await db.collection('users').get();
   console.log('Firestore users (' + snap.size + '):');
@@ -52,16 +75,14 @@ async function seed() {
   const now = new Date();
   const batch = db.batch();
 
-  const users = {
-    lillian: { name: 'Lillian', handle: '@lillian', bio: 'Little stops, good food.', avatarPath: null, email: null },
-    annie: { name: 'Annie', handle: '@annie', bio: 'Little stops, good company.', avatarPath: null, email: null },
-    alicia: { name: 'Alicia', handle: '@alicia', bio: 'Coffee, clay, and a slow Saturday.', avatarPath: null, email: null },
-    tongtong: { name: 'Tongtong', handle: '@tongtong', bio: 'Late lights and leftover songs.', avatarPath: null, email: null },
-    maggie: { name: 'Maggie', handle: '@maggie', bio: 'Kitchens, colors, and a shelf.', avatarPath: null, email: null },
-  };
-
   for (const [id, data] of Object.entries(users)) {
-    batch.set(db.collection('users').doc(id), data);
+    batch.set(db.collection('users').doc(id), {
+      name: data.name,
+      handle: data.handle,
+      bio: data.bio,
+      avatarPath: null,
+      email: data.email,
+    });
     batch.set(db.collection('preferences').doc(id), {
       notifications: true,
       locationServices: true,
@@ -107,7 +128,15 @@ async function seed() {
   }
 
   await batch.commit();
+
+  console.log('Creating Auth accounts...');
+  for (const [id, data] of Object.entries(users)) {
+    const result = await ensureAuthUser(id, data.email, DEMO_PASSWORD, data.name);
+    console.log('  ' + data.email + ' (' + result + ')');
+  }
+
   console.log('Seeded ' + Object.keys(users).length + ' users, ' + pairs.length * 2 + ' friendship docs, ' + crumbs.length + ' crumbs, ' + places.length + ' saved places.');
+  console.log('Demo password for all: ' + DEMO_PASSWORD);
   await listUsers();
 }
 
