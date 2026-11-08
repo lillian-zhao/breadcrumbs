@@ -14,17 +14,24 @@ import {
   Screen,
   SectionHeading,
 } from '@/components/ui';
-import { currentUser, getShadedDays, savedPlaces, today } from '@/data';
+import { emptyPhoto, useCurrentUser, useLoggedDays, useSavedPlaces } from '@/data';
 import { colors, fonts } from '@/theme';
 
-const stats = [
-  { value: currentUser.daysLogged, label: 'days logged' },
-  { value: currentUser.followers, label: 'followers' },
-  { value: currentUser.following, label: 'following' },
-];
-
 export default function Profile() {
-  const [visibleMonth, setVisibleMonth] = useState({ year: today.getFullYear(), month: today.getMonth() });
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const { data: currentUser } = useCurrentUser();
+  const { data: savedPlaces = [] } = useSavedPlaces();
+  const { data: loggedDays = [] } = useLoggedDays(visibleMonth.year, visibleMonth.month);
+  const today = new Date();
+
+  const stats = [
+    { value: currentUser?.daysLogged ?? '–', label: 'days logged' },
+    { value: currentUser?.followers ?? '–', label: 'followers' },
+    { value: currentUser?.following ?? '–', label: 'following' },
+  ];
 
   const shiftMonth = (delta: number) =>
     setVisibleMonth(({ year, month }) => {
@@ -46,11 +53,11 @@ export default function Profile() {
       </HeroTitle>
 
       <View style={styles.profileHeader}>
-        <Avatar photo={currentUser.avatar} size={116} />
-        <Text style={styles.name}>{currentUser.name}</Text>
+        <Avatar photo={currentUser?.avatar ?? emptyPhoto} size={116} />
+        <Text style={styles.name}>{currentUser?.name}</Text>
         <View style={styles.stats}>
           {stats.flatMap((stat, index) => [
-            index > 0 && <View key={`${stat.label}-divider`} style={styles.statDivider} />,
+            index > 0 && <View key={stat.label + '-divider'} style={styles.statDivider} />,
             <Pressable
               key={stat.label}
               style={styles.stat}
@@ -88,13 +95,13 @@ export default function Profile() {
       </View>
 
       <ProfileCalendar
-        personId={currentUser.id}
+        personId={currentUser?.id ?? ''}
         year={visibleMonth.year}
         month={visibleMonth.month}
         today={today}
-        shadedDays={getShadedDays(currentUser.id, visibleMonth.year, visibleMonth.month)}
+        shadedDays={loggedDays}
         onShiftMonth={shiftMonth}
-        onSelectDay={(date) => router.push(`/log-day?date=${toDayParam(date)}` as Href)}
+        onSelectDay={(date) => router.push('/log-day?date=' + toDayParam(date) as Href)}
       />
 
       <Divider tone="toast" style={styles.calendarDivider} />
@@ -107,12 +114,12 @@ export default function Profile() {
             variant="stacked"
             photo={place.photo}
             title={place.name}
-            subtitle={`${place.category} • ${place.price}`}
+            subtitle={place.category + ' • ' + place.price}
             size={{ width: 110, height: 130, photoHeight: 80 }}
             labelColor={colors.bark}
             titleSize={13}
             labelPadding={8}
-            onPress={() => router.push(`/place/${place.id}` as Href)}
+            onPress={() => router.push('/place/' + place.id as Href)}
           />
         ))}
       </View>
