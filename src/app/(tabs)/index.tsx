@@ -25,7 +25,12 @@ export default function Home() {
         <Text style={styles.noteText}>note today’s crumb!</Text>
       </Pressable>
 
-      <Pressable style={styles.wrapped} accessibilityRole="button" accessibilityLabel="your weekly wrapped">
+      <Pressable
+        style={styles.wrapped}
+        onPress={() => router.push('/wrapped' as Href)}
+        accessibilityRole="button"
+        accessibilityLabel="your weekly wrapped"
+      >
         {weeklyWrapped.map((photo, index) => (
           <Photo key={index} photo={photo} style={[styles.wrappedTile, wrappedPositions[index]]} />
         ))}

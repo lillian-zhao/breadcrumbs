@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
+import { Fragment } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { Avatar, IconButton } from '@/components/ui';
-import { mapPhotos, type Photo } from '@/data';
+import { getCrumbsForFriend, getPerson, mapPhotos, nearbyFriendPins, type Crumb, type Photo } from '@/data';
 import { colors, fonts, mapColors, shadows } from '@/theme';
 
 type Rect = [left: number, top: number, width: number, height: number];
@@ -87,7 +88,23 @@ function PlaceLabel({ title, detail, left, top, titleSize, paddingHorizontal, pa
   );
 }
 
-export function DayMap() {
+type Variant = 'mine' | 'friends' | 'friend';
+
+type Props = {
+  variant?: Variant;
+  friendId?: string;
+  onSelectPin?: (id: string) => void;
+};
+
+export function DayMap({ variant = 'mine', friendId, onSelectPin }: Props) {
+  const friendCrumbs = friendId ? getCrumbsForFriend(friendId) : [];
+  const friendPins = [
+    { crumb: friendCrumbs[0], left: 230, top: 266, labelLeft: 251, labelTop: 218 },
+    { crumb: friendCrumbs[1], left: 66, top: 68, labelLeft: 122, labelTop: 70 },
+  ].filter((pin): pin is { crumb: Crumb; left: number; top: number; labelLeft: number; labelTop: number } =>
+    pin.crumb !== undefined,
+  );
+
   return (
     <View style={styles.map}>
       {blocks.map((block, index) => (
@@ -127,39 +144,107 @@ export function DayMap() {
         style={styles.locateButton}
       />
 
-      <View style={styles.currentLocation}>
-        <Image source={require('@assets/shapes/live-indicator.svg')} style={styles.liveIndicator} />
-        <Text style={styles.currentLocationText}>Home · now</Text>
-      </View>
+      {variant !== 'friend' && (
+        <>
+          <View style={styles.currentLocation}>
+            <Image source={require('@assets/shapes/live-indicator.svg')} style={styles.liveIndicator} />
+            <Text style={styles.currentLocationText}>Home · now</Text>
+          </View>
 
-      <View style={[styles.pin, { left: 289, top: 386, width: 46 }]} accessibilityLabel="Home">
-        <View style={styles.homeMarker}>
-          <Image source={require('@assets/icons/house.svg')} style={styles.icon22} />
-        </View>
-        <Image source={require('@assets/shapes/home-pin-tail.svg')} style={styles.pinTail} />
-      </View>
+          <View style={[styles.pin, { left: 289, top: 386, width: 46 }]} accessibilityLabel="Home">
+            <View style={styles.homeMarker}>
+              <Image source={require('@assets/icons/house.svg')} style={styles.icon22} />
+            </View>
+            <Image source={require('@assets/shapes/home-pin-tail.svg')} style={styles.pinTail} />
+          </View>
+        </>
+      )}
 
-      <PlaceLabel
-        title="Cafe"
-        detail="10:30 am · 1 photo"
-        left={251}
-        top={218}
-        titleSize={16}
-        paddingHorizontal={12}
-        paddingVertical={8}
-      />
-      <PhotoPin photo={mapPhotos.cafe} left={230} top={266} label="Cafe" onPress={() => {}} />
+      {variant === 'mine' && (
+        <>
+          <PlaceLabel
+            title="Cafe"
+            detail="10:30 am · 1 photo"
+            left={251}
+            top={218}
+            titleSize={16}
+            paddingHorizontal={12}
+            paddingVertical={8}
+          />
+          <PhotoPin
+            photo={mapPhotos.cafe}
+            left={230}
+            top={266}
+            label="Cafe"
+            onPress={() => onSelectPin?.('cafe')}
+          />
 
-      <PlaceLabel
-        title="Morning walk"
-        detail="9:15 am · Lillian"
-        left={122}
-        top={70}
-        titleSize={15}
-        paddingHorizontal={10}
-        paddingVertical={7}
-      />
-      <PhotoPin photo={mapPhotos.morningWalk} left={66} top={68} label="Morning walk" />
+          <PlaceLabel
+            title="Morning walk"
+            detail="9:15 am · Lillian"
+            left={122}
+            top={70}
+            titleSize={15}
+            paddingHorizontal={10}
+            paddingVertical={7}
+          />
+          <PhotoPin
+            photo={mapPhotos.morningWalk}
+            left={66}
+            top={68}
+            label="Morning walk"
+            onPress={() => onSelectPin?.('walk')}
+          />
+        </>
+      )}
+
+      {variant === 'friends' &&
+        nearbyFriendPins.map((pin) => {
+          const person = getPerson(pin.friendId);
+          if (!person) return null;
+          return (
+            <Fragment key={pin.friendId}>
+              <PlaceLabel
+                title={person.name}
+                detail={`${pin.place} · ${pin.detail}`}
+                left={pin.labelLeft}
+                top={pin.labelTop}
+                titleSize={15}
+                paddingHorizontal={10}
+                paddingVertical={7}
+              />
+              <PhotoPin
+                photo={person.avatar}
+                left={pin.left}
+                top={pin.top}
+                label={`${person.name} at ${pin.place}`}
+                onPress={() => onSelectPin?.(pin.friendId)}
+              />
+            </Fragment>
+          );
+        })}
+
+      {variant === 'friend' &&
+        friendPins.map(({ crumb, left, top, labelLeft, labelTop }) => (
+          <Fragment key={crumb.id}>
+            <PlaceLabel
+              title={crumb.place}
+              detail={`${crumb.time} · ${crumb.city}`}
+              left={labelLeft}
+              top={labelTop}
+              titleSize={15}
+              paddingHorizontal={10}
+              paddingVertical={7}
+            />
+            <PhotoPin
+              photo={crumb.photo}
+              left={left}
+              top={top}
+              label={crumb.place}
+              onPress={() => onSelectPin?.(crumb.id)}
+            />
+          </Fragment>
+        ))}
 
       <Image source={require('@assets/shapes/daily-trail.png')} style={styles.trail} pointerEvents="none" />
     </View>

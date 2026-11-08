@@ -12,7 +12,7 @@ type Props<T extends string> = {
   value: T;
   onChange?: (value: T) => void;
   /**
-   * `pills` — separate rounded pills (Gallery tabs, Map view toggle).
+   * `pills` — separate rounded pills (Map view toggle).
    * `boxed` — bordered box with a filled segment (Calendar month/year).
    * `track` — sliding thumb on a tinted track (Settings tabs).
    */

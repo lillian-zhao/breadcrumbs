@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -32,7 +32,12 @@ export default function EditProfile() {
       <View style={styles.content}>
         <View style={styles.photoEditor}>
           <Avatar photo={currentUser.avatar} size={116} />
-          <Pill label="Change profile photo" icon={require('@assets/icons/camera.svg')} tintIcons onPress={() => {}} />
+          <Pill
+            label="Change profile photo"
+            icon={require('@assets/icons/camera.svg')}
+            tintIcons
+            onPress={() => router.push('/edit-photo?from=profile' as Href)}
+          />
         </View>
 
         <SectionHeading label="your profile" fontSize={19} ruleOpacity={0.6} />

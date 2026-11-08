@@ -19,26 +19,38 @@ type Props = {
 /** Full-width cream place tile used by Saved spots and place collections. */
 export function PlaceCard({ photo, title, subtitle, caption, bookmarked = true, onPress, onBookmark }: Props) {
   return (
-    <Pressable onPress={onPress} style={styles.card} accessibilityRole="button" accessibilityLabel={`${title}, ${subtitle}`}>
-      <Photo photo={photo} style={styles.photo} />
-      <View style={styles.info}>
-        <View style={styles.identity}>
-          <View style={styles.names}>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+    <View style={styles.card}>
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        style={styles.body}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={`${title}, ${subtitle}`}
+      >
+        <Photo photo={photo} style={styles.photo} />
+        <View style={styles.info}>
+          <View style={styles.identity}>
+            <View style={styles.names}>
+              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
+            </View>
+            {onBookmark ? <View style={styles.bookmarkSpacer} /> : null}
           </View>
-          <Pressable
-            onPress={onBookmark}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={bookmarked ? `Remove ${title}` : `Save ${title}`}
-          >
-            <Image source={require('@assets/icons/bookmark.svg')} style={styles.bookmark} />
-          </Pressable>
+          <Text style={styles.caption}>{caption}</Text>
         </View>
-        <Text style={styles.caption}>{caption}</Text>
-      </View>
-    </Pressable>
+      </Pressable>
+      {onBookmark ? (
+        <Pressable
+          onPress={onBookmark}
+          hitSlop={8}
+          style={styles.bookmarkButton}
+          accessibilityRole="button"
+          accessibilityLabel={bookmarked ? `Remove ${title}` : `Save ${title}`}
+        >
+          <Image source={require('@assets/icons/bookmark.svg')} style={styles.bookmark} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -47,6 +59,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 14,
     backgroundColor: colors.cream,
+  },
+  body: {
+    overflow: 'hidden',
   },
   photo: {
     height: 152,
@@ -63,6 +78,15 @@ const styles = StyleSheet.create({
   names: {
     flex: 1,
     gap: 5,
+  },
+  bookmarkSpacer: {
+    width: 20,
+    height: 20,
+  },
+  bookmarkButton: {
+    position: 'absolute',
+    right: 14,
+    top: 166,
   },
   title: {
     fontFamily: fonts.display,

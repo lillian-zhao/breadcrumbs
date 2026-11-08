@@ -9,6 +9,7 @@ export { HeroTitle } from './HeroTitle';
 export { IconButton } from './IconButton';
 export { ListRow } from './ListRow';
 export { PageHeader } from './PageHeader';
+export { PersonRow } from './PersonRow';
 export { Photo } from './Photo';
 export { PhotoCard } from './PhotoCard';
 export { Pill, type PillSize, type PillTone } from './Pill';

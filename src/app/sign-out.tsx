@@ -5,9 +5,12 @@ import { Image } from 'expo-image';
 
 import { Avatar, Button, Caption, ListRow, Screen, SectionHeading, StatusMessage } from '@/components/ui';
 import { currentUser } from '@/data';
+import { useSession } from '@/session';
 import { colors, fonts } from '@/theme';
 
 export default function SignOut() {
+  const { signOut } = useSession();
+
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <View style={styles.sheet}>
@@ -47,7 +50,7 @@ export default function SignOut() {
 
         <View style={styles.actions}>
           <Button label="Stay signed in" variant="secondary" fill onPress={() => router.back()} />
-          <Button label="Sign out" fill onPress={() => router.replace('/')} />
+          <Button label="Sign out" fill onPress={signOut} />
         </View>
         <Button label="Cancel · Back to Settings" variant="secondary" onPress={() => router.back()} />
       </View>

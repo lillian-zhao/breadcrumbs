@@ -1,7 +1,9 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { formatLoggedDay, parseDayParam } from '@/components/calendar';
+import { NoLogDay } from '@/components/NoLogDay';
 import {
   Button,
   Card,
@@ -13,17 +15,13 @@ import {
   SectionHeading,
   TextField,
 } from '@/components/ui';
-import { currentUser, todaysLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
+import { currentUser, hasLoggedDay, todaysLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
 import { colors, fonts } from '@/theme';
 
 const audienceHelp: Record<Audience, string> = {
   private: 'Only you can see this day until you choose to share.',
   friends: 'Your friends can see this day and its photos.',
 };
-
-function formatDay(date: Date) {
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-}
 
 function stopDetail(stop: Stop) {
   const parts = [stop.time, stop.city];
@@ -39,54 +37,77 @@ function FeaturedStop({ stop, photo }: { stop: Stop; photo: PhotoData }) {
         <Text style={styles.stopName}>{stop.name}</Text>
         <Text style={styles.caption}>{stopDetail(stop)}</Text>
       </View>
-      <Pill label="Edit" accessibilityLabel={`Edit ${stop.name}`} onPress={() => {}} />
+      <Pill
+        label="Edit"
+        accessibilityLabel={`Edit ${stop.name}`}
+        onPress={() => router.push(`/edit-location?stop=${stop.id}` as Href)}
+      />
     </View>
   );
 }
 
 export default function LogDay() {
-  const [note, setNote] = useState(todaysLog.note);
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const date = parseDayParam(dateParam) ?? todaysLog.date;
+  const fromCalendar = parseDayParam(dateParam) !== undefined;
+  const logged = hasLoggedDay(currentUser.id, date);
+  const isNew = fromCalendar && !logged;
+  const [composing, setComposing] = useState(!fromCalendar || logged);
+  const [note, setNote] = useState(isNew ? '' : todaysLog.note);
   const [audience, setAudience] = useState<Audience>(todaysLog.audience);
   const [featured, ...otherStops] = todaysLog.stops;
   const attachedCount = todaysLog.photos.length;
+  const dayLabel = formatLoggedDay(date);
+
+  if (fromCalendar && !logged && !composing) {
+    return (
+      <NoLogDay date={date} backLabel="Calendar" ownerName={currentUser.name} onCompose={() => setComposing(true)} />
+    );
+  }
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <PageHeader
         back={{
-          label: 'Home',
+          label: fromCalendar ? 'Calendar' : 'Home',
           icon: require('@assets/icons/arrow-return.svg'),
           iconSize: 15.27,
           iconStyle: styles.returnIcon,
         }}
         title={{ title: 'Log a Day', fontSize: 44, lineHeight: 49.28 }}
-        subtitle={`${currentUser.name}’s crumbs · Today, Oct 5`}
+        subtitle={`${currentUser.name}’s crumbs · ${dayLabel}`}
         style={styles.header}
       />
 
       <View style={styles.content}>
         <ListRow
           icon={require('@assets/icons/calendar-row.svg')}
-          title={formatDay(todaysLog.date)}
-          subtitle={`Today · ${todaysLog.location}`}
+          title={dayLabel}
+          subtitle={logged ? todaysLog.location : 'A new crumb for this date'}
           actionLabel="Change"
           onAction={() => {}}
         />
 
         <SectionHeading label="today’s stops" fontSize={19} ruleOpacity={0.6} />
-        <Card>
-          {featured.photo && <FeaturedStop stop={featured} photo={featured.photo} />}
-          {otherStops.map((stop) => (
-            <ListRow
-              key={stop.id}
-              icon={require('@assets/icons/map-pin-row.svg')}
-              title={stop.name}
-              subtitle={stopDetail(stop)}
-              actionLabel="Edit"
-              onAction={() => {}}
-            />
-          ))}
-        </Card>
+        {isNew ? (
+          <Card>
+            <Text style={styles.caption}>No stops yet. Add the first place for this day.</Text>
+          </Card>
+        ) : (
+          <Card>
+            {featured.photo && <FeaturedStop stop={featured} photo={featured.photo} />}
+            {otherStops.map((stop) => (
+              <ListRow
+                key={stop.id}
+                icon={require('@assets/icons/map-pin-row.svg')}
+                title={stop.name}
+                subtitle={stopDetail(stop)}
+                actionLabel="Edit"
+                onAction={() => router.push(`/edit-location?stop=${stop.id}` as Href)}
+              />
+            ))}
+          </Card>
+        )}
         <Button
           label="Add location"
           variant="secondary"
@@ -95,15 +116,29 @@ export default function LogDay() {
         />
 
         <SectionHeading label="little moments" fontSize={19} ruleOpacity={0.6} />
-        <View style={styles.moments}>
-          <Photo photo={todaysLog.photos[0]} style={styles.momentPhoto} />
-          <View style={styles.photoAction}>
-            <Button label="Add photo" variant="secondary" icon={require('@assets/icons/camera.svg')} onPress={() => {}} />
-            <Text style={styles.caption}>
-              {attachedCount} photo{attachedCount === 1 ? '' : 's'} attached · Preview to edit
-            </Text>
+        {isNew ? (
+          <Button
+            label="Add photo"
+            variant="secondary"
+            icon={require('@assets/icons/camera.svg')}
+            onPress={() => router.push('/edit-photo')}
+          />
+        ) : (
+          <View style={styles.moments}>
+            <Photo photo={todaysLog.photos[0]} style={styles.momentPhoto} />
+            <View style={styles.photoAction}>
+              <Button
+                label="Add photo"
+                variant="secondary"
+                icon={require('@assets/icons/camera.svg')}
+                onPress={() => router.push('/edit-photo')}
+              />
+              <Text style={styles.caption}>
+                {attachedCount} photo{attachedCount === 1 ? '' : 's'} attached · Preview to edit
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <TextField
           label="A note for this day"
