@@ -1,4 +1,13 @@
-import { StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type KeyboardTypeOptions,
+  type StyleProp,
+  type TextInputProps,
+  type ViewStyle,
+} from 'react-native';
 
 import { colors, fonts, radii } from '@/theme';
 
@@ -9,11 +18,29 @@ type Props = {
   placeholder?: string;
   helper?: string;
   multiline?: boolean;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
+  autoComplete?: TextInputProps['autoComplete'];
+  autoCorrect?: boolean;
+  textContentType?: TextInputProps['textContentType'];
   style?: StyleProp<ViewStyle>;
 };
 
 /** Labeled "Form field" with an optional helper line. */
-export function TextField({ label, value, onChangeText, placeholder, helper, multiline = false, style }: Props) {
+export function TextField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  helper,
+  multiline = false,
+  keyboardType,
+  autoCapitalize,
+  autoComplete,
+  autoCorrect,
+  textContentType,
+  style,
+}: Props) {
   return (
     <View style={[styles.field, style]}>
       <Text style={styles.label}>{label}</Text>
@@ -24,6 +51,11 @@ export function TextField({ label, value, onChangeText, placeholder, helper, mul
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         multiline={multiline}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
+        autoCorrect={autoCorrect}
+        textContentType={textContentType}
         textAlignVertical={multiline ? 'top' : 'center'}
         accessibilityLabel={label}
       />

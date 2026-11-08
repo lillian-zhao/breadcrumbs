@@ -49,6 +49,14 @@ export type LinkedAccount = {
   connected: boolean;
 };
 
+/** A friend's weekly recap summary. */
+export type FriendWeek = {
+  friendId: string;
+  cover: Photo;
+  places: number;
+  newPlaces: number;
+};
+
 /** A friend with their crumb activity: total places and how many are from the last week. */
 export type FriendActivity = {
   id: string;
@@ -57,6 +65,12 @@ export type FriendActivity = {
   avatar: Photo;
   places: number;
   newPlaces: number;
+};
+
+/** Someone you don't follow yet, reached through people you already follow. */
+export type FriendOfFriend = {
+  id: string;
+  via: string[];
 };
 
 export type SavedPlace = {
@@ -80,6 +94,32 @@ export type GallerySection = {
   photos: Photo[];
 };
 
+export type PlaceDetail = {
+  id: string;
+  name: string;
+  city: string;
+  category: string;
+  photo: Photo;
+  photos: Photo[];
+  friendIds: string[];
+  visits: { title: string; subtitle: string }[];
+};
+
+export type BlockedUser = {
+  id: string;
+  name: string;
+  handle: string;
+  initials: string;
+  detail: string;
+};
+
+export type WeekHighlight = {
+  title: string;
+  subtitle: string;
+  actionLabel: string;
+  href: string;
+};
+
 export type Highlight = {
   id: string;
   friendId: string;
@@ -87,6 +127,29 @@ export type Highlight = {
   tag: string;
   date: string;
   photo: Photo;
+};
+
+/** A friend’s shared stop, used by map pins and crumb detail. */
+export type Crumb = {
+  id: string;
+  friendId: string;
+  placeId: string;
+  place: string;
+  time: string;
+  city: string;
+  photo: Photo;
+  note: string;
+};
+
+export type NearbyFriendPin = {
+  friendId: string;
+  crumbId: string;
+  place: string;
+  detail: string;
+  left: number;
+  top: number;
+  labelLeft: number;
+  labelTop: number;
 };
 
 export type Stop = {

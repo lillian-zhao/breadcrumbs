@@ -1,14 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { buildWeeks, isSameDay, weekdayLabels } from '@/components/calendar';
 import { colors, fonts, radii } from '@/theme';
 
-const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const columnWidths = [50, 50, 50, 50, 50, 52, 52];
-
-type Day = {
-  date: Date;
-  inMonth: boolean;
-};
 
 type Props = {
   year: number;
@@ -18,32 +13,14 @@ type Props = {
   onSelectDay?: (date: Date) => void;
 };
 
-function buildWeeks(year: number, month: number): Day[][] {
-  const first = new Date(year, month, 1);
-  const leading = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cellCount = Math.ceil((leading + daysInMonth) / 7) * 7;
-
-  const days = Array.from({ length: cellCount }, (_, index) => {
-    const date = new Date(year, month, index - leading + 1);
-    return { date, inMonth: date.getMonth() === month };
-  });
-
-  return Array.from({ length: cellCount / 7 }, (_, week) => days.slice(week * 7, week * 7 + 7));
-}
-
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
 export function MonthCalendar({ year, month, today, shadedDays = [], onSelectDay }: Props) {
   const weeks = buildWeeks(year, month);
 
   return (
     <View>
       <View style={styles.header}>
-        {weekdays.map((weekday, column) => (
-          <Text key={weekday} style={[styles.weekday, { width: columnWidths[column] }]}>
+        {weekdayLabels.map((weekday, column) => (
+          <Text key={`${weekday}-${column}`} style={[styles.weekday, { width: columnWidths[column] }]}>
             {weekday}
           </Text>
         ))}

@@ -21,9 +21,6 @@ export default function TabLayout() {
         <TabTrigger name="map" href="/map" asChild>
           <TabButton label="Map" icon={require('@assets/icons/tab-map.png')} />
         </TabTrigger>
-        <TabTrigger name="gallery" href="/gallery" asChild>
-          <TabButton label="Gallery" icon={require('@assets/icons/tab-gallery.png')} />
-        </TabTrigger>
         <TabTrigger name="friends" href="/friends" asChild>
           <TabButton label="Friends" icon={require('@assets/icons/tab-friends.png')} />
         </TabTrigger>

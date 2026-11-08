@@ -1,9 +1,9 @@
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { MonthCalendar } from '@/components/MonthCalendar';
+import { toDayParam } from '@/components/calendar';
+import { ProfileCalendar } from '@/components/ProfileCalendar';
 import {
   ActionCard,
   Avatar,
@@ -13,27 +13,18 @@ import {
   PhotoCard,
   Screen,
   SectionHeading,
-  SegmentedControl,
 } from '@/components/ui';
-import { emptyPhoto, useAlbums, useCurrentUser, useLoggedDays, useSavedPlaces } from '@/data';
-import { colors, fonts, radii } from '@/theme';
+import { currentUser, getShadedDays, savedPlaces, today } from '@/data';
+import { colors, fonts } from '@/theme';
 
-type CalendarScale = 'month' | 'year';
+const stats = [
+  { value: currentUser.daysLogged, label: 'days logged' },
+  { value: currentUser.followers, label: 'followers' },
+  { value: currentUser.following, label: 'following' },
+];
 
 export default function Profile() {
-  const [today] = useState(() => new Date());
   const [visibleMonth, setVisibleMonth] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [scale, setScale] = useState<CalendarScale>('month');
-  const { data: currentUser } = useCurrentUser();
-  const { data: loggedDays = [] } = useLoggedDays(visibleMonth.year, visibleMonth.month);
-  const { data: savedPlaces = [] } = useSavedPlaces();
-  const { data: albums = [] } = useAlbums();
-
-  const stats = [
-    { value: currentUser?.daysLogged ?? '–', label: 'days logged' },
-    { value: currentUser?.followers ?? '–', label: 'followers' },
-    { value: currentUser?.following ?? '–', label: 'following' },
-  ];
 
   const shiftMonth = (delta: number) =>
     setVisibleMonth(({ year, month }) => {
@@ -55,12 +46,23 @@ export default function Profile() {
       </HeroTitle>
 
       <View style={styles.profileHeader}>
-        <Avatar photo={currentUser?.avatar ?? emptyPhoto} size={116} />
-        <Text style={styles.name}>{currentUser?.name}</Text>
+        <Avatar photo={currentUser.avatar} size={116} />
+        <Text style={styles.name}>{currentUser.name}</Text>
         <View style={styles.stats}>
           {stats.flatMap((stat, index) => [
             index > 0 && <View key={`${stat.label}-divider`} style={styles.statDivider} />,
-            <Pressable key={stat.label} style={styles.stat} accessibilityRole="button">
+            <Pressable
+              key={stat.label}
+              style={styles.stat}
+              accessibilityRole="button"
+              onPress={
+                stat.label === 'followers'
+                  ? () => router.push('/people?tab=followers' as Href)
+                  : stat.label === 'following'
+                    ? () => router.push('/people?tab=following' as Href)
+                    : undefined
+              }
+            >
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </Pressable>,
@@ -85,35 +87,14 @@ export default function Profile() {
         />
       </View>
 
-      <Text style={styles.calendarTitle}>Calendar</Text>
-
-      <View style={styles.calendarNav}>
-        <IconButton
-          icon={require('@assets/icons/chevron-left.svg')}
-          accessibilityLabel="Previous month"
-          onPress={() => shiftMonth(-1)}
-        />
-        <SegmentedControl
-          variant="boxed"
-          segments={[
-            { value: 'month', label: 'Month' },
-            { value: 'year', label: 'Year' },
-          ]}
-          value={scale}
-          onChange={setScale}
-        />
-        <IconButton
-          icon={require('@assets/icons/chevron-right.svg')}
-          accessibilityLabel="Next month"
-          onPress={() => shiftMonth(1)}
-        />
-      </View>
-
-      <MonthCalendar
+      <ProfileCalendar
+        personId={currentUser.id}
         year={visibleMonth.year}
         month={visibleMonth.month}
         today={today}
-        shadedDays={loggedDays}
+        shadedDays={getShadedDays(currentUser.id, visibleMonth.year, visibleMonth.month)}
+        onShiftMonth={shiftMonth}
+        onSelectDay={(date) => router.push(`/log-day?date=${toDayParam(date)}` as Href)}
       />
 
       <Divider tone="toast" style={styles.calendarDivider} />
@@ -131,28 +112,7 @@ export default function Profile() {
             labelColor={colors.bark}
             titleSize={13}
             labelPadding={8}
-            onPress={() => router.push('/saved-spots')}
-          />
-        ))}
-      </View>
-
-      <Divider tone="toast" style={styles.albumsDivider} />
-
-      <SectionHeading label="photo albums" gap={9} labelInset={5} style={[styles.inset, styles.sectionHeading]} />
-      <Pressable style={styles.viewAll} onPress={() => router.navigate('/gallery')} accessibilityRole="button">
-        <Text style={styles.viewAllText}>View all</Text>
-        <Image source={require('@assets/icons/chevron-view-all.svg')} style={styles.viewAllChevron} />
-      </Pressable>
-      <View style={[styles.tileRow, styles.albums]}>
-        {albums.map((album) => (
-          <PhotoCard
-            key={album.id}
-            variant="stacked"
-            photo={album.cover}
-            title={album.title}
-            subtitle={`${album.photoCount} photos`}
-            size={{ width: 170, height: 153, photoHeight: 100 }}
-            onPress={() => router.navigate('/gallery')}
+            onPress={() => router.push(`/place/${place.id}` as Href)}
           />
         ))}
       </View>
@@ -207,27 +167,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 14,
   },
-  calendarTitle: {
-    marginTop: 30,
-    height: 30,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    color: colors.bark,
-    textAlign: 'center',
-  },
-  calendarNav: {
-    marginTop: 8,
-    marginBottom: 16,
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   calendarDivider: {
     marginTop: 14,
-  },
-  albumsDivider: {
-    marginTop: 18,
   },
   sectionHeading: {
     height: 37,
@@ -237,30 +178,5 @@ const styles = StyleSheet.create({
   tileRow: {
     flexDirection: 'row',
     gap: 12,
-  },
-  viewAll: {
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: colors.sand,
-    borderRadius: radii.control,
-    backgroundColor: colors.cream,
-  },
-  viewAllText: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 14,
-    color: colors.bark,
-  },
-  viewAllChevron: {
-    width: 8.173,
-    height: 13.8,
-    marginRight: -1.27,
-  },
-  albums: {
-    marginTop: 10,
-    gap: 14,
   },
 });

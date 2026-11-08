@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -69,7 +69,7 @@ export default function SavedSpots() {
             title={place.name}
             subtitle={`${place.category} • ${place.price}`}
             caption="Saved to your spots · View place ↗"
-            onPress={() => router.push('/map')}
+            onPress={() => router.push(`/place/${place.id}` as Href)}
             onBookmark={() => remove(place.id)}
           />
         ))}

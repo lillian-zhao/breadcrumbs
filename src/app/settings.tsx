@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -108,13 +108,18 @@ export default function Settings() {
             subtitle="instagram, google, apple"
             onPress={() => router.push('/linked-accounts')}
           />
-          <ListRow variant="settings" title="privacy" subtitle="blocked users, data & activity" onPress={() => {}} />
+          <ListRow
+            variant="settings"
+            title="privacy"
+            subtitle="blocked users, data & activity"
+            onPress={() => router.push('/blocked' as Href)}
+          />
 
           <View style={styles.accountActions}>
             <Pressable onPress={() => router.push('/sign-out')} accessibilityRole="button" hitSlop={8}>
               <Text style={styles.signOut}>sign out</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" hitSlop={8}>
+            <Pressable onPress={() => router.push('/delete-account' as Href)} accessibilityRole="button" hitSlop={8}>
               <Text style={styles.deleteAccount}>delete account</Text>
             </Pressable>
           </View>
@@ -126,7 +131,7 @@ export default function Settings() {
             variant="settings"
             title="profile visibility"
             subtitle="who can find you on crumbs"
-            onPress={() => {}}
+            onPress={() => router.push('/visibility' as Href)}
           />
           <ListRow
             variant="settings"
@@ -144,7 +149,7 @@ export default function Settings() {
             variant="settings"
             title="blocked users"
             subtitle="people who can’t see your crumbs"
-            onPress={() => {}}
+            onPress={() => router.push('/blocked' as Href)}
           />
         </>
       )}

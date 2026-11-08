@@ -1,168 +1,177 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { toDayParam } from '@/components/calendar';
+import { ProfileCalendar } from '@/components/ProfileCalendar';
+import { useConnections } from '@/connections';
 import {
+  ActionCard,
   Avatar,
-  Button,
+  BackButton,
   Caption,
   Card,
-  ListRow,
-  PageHeader,
-  Photo,
+  Divider,
+  HeroTitle,
+  PhotoCard,
   Pill,
   Screen,
   SectionHeading,
 } from '@/components/ui';
-import type { FriendshipState } from '@/api';
-import { acceptFriend, requestFriend, unfriend, useFriendProfile, useFriends, useHighlights } from '@/data';
+import {
+  countLoggedDays,
+  friendsOfFriends,
+  getPerson,
+  getShadedDays,
+  getSharedPlaces,
+  mutualLabel,
+  today,
+} from '@/data';
 import { colors, fonts } from '@/theme';
-
-/** The follow pill for each relationship; null hides it. */
-function followAction(status: FriendshipState, friendId: string) {
-  switch (status.kind) {
-    case 'accepted':
-      return { label: 'Following', selected: true, run: () => unfriend(friendId) };
-    case 'pending':
-      return status.direction === 'incoming'
-        ? { label: 'Accept', selected: false, run: () => acceptFriend(friendId) }
-        : { label: 'Requested', selected: true, run: undefined };
-    case 'none':
-      return { label: 'Follow', selected: false, run: () => requestFriend(friendId) };
-    default:
-      return null;
-  }
-}
 
 export default function FriendProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const friendId = Array.isArray(id) ? id[0] : id;
-  const { data, loading, reload } = useFriendProfile(friendId);
-  const { data: highlights = [] } = useHighlights();
-  const { data: friends = [] } = useFriends();
-  const [saving, setSaving] = useState(false);
+  const friend = friendId ? getPerson(friendId) : undefined;
+  const suggestion = friendsOfFriends.find((item) => item.id === friend?.id);
+  const { isFollowing, toggleFollow } = useConnections();
+  const following = friend ? isFollowing(friend.id) : false;
+  const [visibleMonth, setVisibleMonth] = useState({ year: today.getFullYear(), month: today.getMonth() });
+  const places = friend ? getSharedPlaces(friend.id) : [];
+  const daysShared = friend ? countLoggedDays(friend.id, visibleMonth.year) : 0;
 
-  if (!data?.friend) {
+  const shiftMonth = (delta: number) =>
+    setVisibleMonth(({ year, month }) => {
+      const next = new Date(year, month + delta, 1);
+      return { year: next.getFullYear(), month: next.getMonth() };
+    });
+
+  if (!friend) {
     return (
       <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
-        <PageHeader back={{ label: 'Back' }} title={{ title: loading ? '…' : 'Not found', fontSize: 44, lineHeight: 49.28 }} />
+        <BackButton />
+        <Caption>That person isn’t in your circle yet.</Caption>
       </Screen>
     );
   }
 
-  const { friend, status } = data;
-  const isFriend = status.kind === 'accepted';
-  const highlight = highlights.find((item) => item.friendId === friend.id);
-  const activity = friends.find((item) => item.id === friend.id);
-  const follow = followAction(status, friend.id);
-  const runFollow = follow?.run;
+  const stats = [
+    { value: daysShared, label: 'days shared' },
+    { value: places.length, label: 'saved spots' },
+  ];
 
   return (
-    <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
-      <PageHeader
-        back={{ label: 'Back' }}
-        title={{ title: friend.name, fontSize: 44, lineHeight: 49.28 }}
-        subtitle="A friend’s corner of Crumbs"
-        style={styles.header}
-      />
+    <Screen topOffset={20} contentWidth={354} withTabBar={false}>
+      <BackButton label="Friends" style={styles.back} />
+      <HeroTitle title="Profile" height={96} ornamentsLeft={277} style={styles.inset} />
 
-      <View style={styles.content}>
-        <View style={styles.identity}>
-          <Avatar photo={friend.avatar} size={104} />
-          <Text style={styles.name}>{friend.name}</Text>
-          <Text style={styles.handle}>{friend.handle}</Text>
-          {follow && (
-            <Pill
-              label={follow.label}
-              icon={follow.selected ? require('@assets/icons/check.svg') : undefined}
-              tintIcons
-              tone={follow.selected ? 'selected' : 'default'}
-              onPress={
-                runFollow && !saving
-                  ? () => {
-                      setSaving(true);
-                      runFollow()
-                        .catch(console.warn)
-                        .finally(() => {
-                          setSaving(false);
-                          reload();
-                        });
-                    }
-                  : undefined
-              }
-            />
-          )}
-        </View>
-
-        <Card>
-          {!!friend.bio && <Text style={styles.bio}>{friend.bio}</Text>}
-          <Caption>
-            {isFriend
-              ? `Friends only · You can see ${friend.name}’s shared crumbs.`
-              : `Follow ${friend.name} to see the crumbs they share with friends.`}
-          </Caption>
-        </Card>
-
-        {highlight && (
-          <>
-            <SectionHeading label="recent highlight" fontSize={19} ruleOpacity={0.6} />
-            <Photo photo={highlight.photo} style={styles.highlight} />
-            <ListRow title={highlight.tag} subtitle={highlight.date} actionLabel="View crumb" onAction={() => {}} />
-          </>
+      <View style={styles.profileHeader}>
+        <Avatar photo={friend.avatar} size={116} />
+        <Text style={styles.name}>{friend.name}</Text>
+        <Pill
+          label={following ? 'Following' : 'Follow'}
+          icon={following ? require('@assets/icons/check.svg') : undefined}
+          tintIcons
+          tone={following ? 'selected' : 'default'}
+          onPress={() => toggleFollow(friend.id)}
+        />
+        {following && (
+          <View style={styles.stats}>
+            {stats.flatMap((stat, index) => [
+              index > 0 && <View key={`${stat.label}-divider`} style={styles.statDivider} />,
+              <View key={stat.label} style={styles.stat}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>,
+            ])}
+          </View>
         )}
-
-        <SectionHeading label="discover together" fontSize={19} ruleOpacity={0.6} />
-        <ListRow
-          title="Shared spots"
-          subtitle="HeyTea · A place in both your circles"
-          actionLabel="View place"
-          onAction={() => router.push('/map')}
-        />
-        <ListRow
-          icon={require('@assets/icons/bookmark.svg')}
-          iconTint={colors.crumb}
-          title="Saved places"
-          subtitle={`Places ${friend.name} chooses to share`}
-          actionLabel="View saved"
-          onAction={() => router.push('/saved-spots')}
-        />
-        <ListRow
-          title={`${friend.name}’s weekly wrapped`}
-          subtitle={activity ? `${activity.places} places · ${activity.newPlaces} new` : 'This week’s recap'}
-          actionLabel="View recap"
-        />
-
-        <Caption>Private days, follower totals and visit history are not shown here.</Caption>
-        <Button label="Back to your people" variant="secondary" onPress={() => router.back()} />
       </View>
+
+      {!following && (
+        <Card style={styles.inset}>
+          {!!friend.bio && <Text style={styles.bio}>{friend.bio}</Text>}
+          {suggestion && <Caption>{mutualLabel(suggestion.via)}</Caption>}
+          <Caption>Follow {friend.name} to see the crumbs they share with friends.</Caption>
+        </Card>
+      )}
+
+      {following && (
+        <>
+          <View style={styles.actionCards}>
+            <ActionCard
+              icon={require('@assets/icons/map-pin-card.svg')}
+              title="Saved spots"
+              subtitle={`Places ${friend.name} shares`}
+              color={colors.bark}
+              href={`/friend-places/${friend.id}` as Href}
+            />
+            <ActionCard
+              icon={require('@assets/icons/plus-circle.svg')}
+              title="Their week"
+              subtitle="A shared recap"
+              color={colors.crumb}
+              href={`/wrapped?friend=${friend.id}` as Href}
+            />
+          </View>
+
+          <ProfileCalendar
+            personId={friend.id}
+            year={visibleMonth.year}
+            month={visibleMonth.month}
+            today={today}
+            shadedDays={getShadedDays(friend.id, visibleMonth.year, visibleMonth.month)}
+            onShiftMonth={shiftMonth}
+            onSelectDay={(date) => router.push(`/journal/${friend.id}?date=${toDayParam(date)}` as Href)}
+          />
+
+          <Divider tone="toast" style={styles.calendarDivider} />
+
+          <SectionHeading
+            label="saved locations"
+            gap={9}
+            labelInset={5}
+            style={[styles.inset, styles.sectionHeading]}
+          />
+          <View style={styles.tileRow}>
+            {places.map((place) => (
+              <PhotoCard
+                key={place.id}
+                variant="stacked"
+                photo={place.photo}
+                title={place.name}
+                subtitle={`${place.category} • ${place.price}`}
+                size={{ width: 110, height: 130, photoHeight: 80 }}
+                labelColor={colors.bark}
+                titleSize={13}
+                labelPadding={8}
+                onPress={() => router.push(`/place/${place.id}` as Href)}
+              />
+            ))}
+          </View>
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginBottom: 24,
+  back: {
+    marginLeft: 10,
   },
-  content: {
-    gap: 22,
+  inset: {
+    marginHorizontal: 10,
   },
-  identity: {
+  profileHeader: {
+    minHeight: 225,
     alignItems: 'center',
     gap: 10,
+    marginBottom: 8,
   },
   name: {
     fontFamily: fonts.display,
-    fontSize: 28,
-    lineHeight: 33,
+    fontSize: 26,
     color: colors.ink,
-    textAlign: 'center',
-  },
-  handle: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20.3,
-    color: colors.caption,
-    textAlign: 'center',
   },
   bio: {
     fontFamily: fonts.body,
@@ -170,7 +179,44 @@ const styles = StyleSheet.create({
     lineHeight: 20.3,
     color: colors.ink,
   },
-  highlight: {
-    height: 228,
+  stats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 24,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: colors.toast,
+  },
+  stat: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  statValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    color: colors.ink,
+  },
+  statLabel: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.bark,
+  },
+  actionCards: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  calendarDivider: {
+    marginTop: 14,
+  },
+  sectionHeading: {
+    height: 37,
+    marginTop: 15,
+    marginBottom: 11,
+  },
+  tileRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
 });

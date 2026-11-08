@@ -13,7 +13,7 @@ type Props = {
   subtitle: string;
   /**
    * `overlay` — the label floats over the bottom of a square photo (friend cards).
-   * `stacked` — the label sits below the photo inside one tile (places, albums).
+   * `stacked` — the label sits below the photo inside one tile (saved places).
    */
   variant?: 'overlay' | 'stacked';
   size?: Size;
