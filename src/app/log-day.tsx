@@ -121,7 +121,7 @@ export default function LogDay() {
             label="Add photo"
             variant="secondary"
             icon={require('@assets/icons/camera.svg')}
-            onPress={() => router.push('/edit-photo')}
+            onPress={() => router.push('/edit-photo' as Href)}
           />
         ) : (
           <View style={styles.moments}>
@@ -131,7 +131,7 @@ export default function LogDay() {
                 label="Add photo"
                 variant="secondary"
                 icon={require('@assets/icons/camera.svg')}
-                onPress={() => router.push('/edit-photo')}
+                onPress={() => router.push('/edit-photo' as Href)}
               />
               <Text style={styles.caption}>
                 {attachedCount} photo{attachedCount === 1 ? '' : 's'} attached · Preview to edit

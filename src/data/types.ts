@@ -123,7 +123,7 @@ export type WeekHighlight = {
 export type Highlight = {
   id: string;
   friendId: string;
-  friendName: string;
+  friendName?: string;
   tag: string;
   date: string;
   photo: Photo;

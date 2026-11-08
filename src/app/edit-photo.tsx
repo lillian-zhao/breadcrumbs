@@ -4,15 +4,32 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button, Caption, PageHeader, Photo, Pill, Screen, SectionHeading, TextField } from '@/components/ui';
 import { currentUser, todaysLog } from '@/data';
+import { pickImageFromLibrary } from '@/lib/image-picker';
 
 type Tool = 'crop' | 'rotate';
 
 export default function EditPhoto() {
   const { from: fromParam } = useLocalSearchParams<{ from?: string }>();
   const fromProfile = (Array.isArray(fromParam) ? fromParam[0] : fromParam) === 'profile';
-  const photo = fromProfile ? currentUser.avatar : todaysLog.photos[0];
+  const [pickedUri, setPickedUri] = useState<string>();
+  const [picking, setPicking] = useState(false);
+  const photo = pickedUri
+    ? { source: { uri: pickedUri } }
+    : fromProfile
+      ? currentUser.avatar
+      : todaysLog.photos[0];
   const [caption, setCaption] = useState(fromProfile ? '' : 'A little pause at Cafe.');
   const [tool, setTool] = useState<Tool>('crop');
+
+  const replacePhoto = async () => {
+    setPicking(true);
+    try {
+      const picked = await pickImageFromLibrary();
+      if (picked) setPickedUri(picked.uri);
+    } finally {
+      setPicking(false);
+    }
+  };
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
@@ -26,17 +43,16 @@ export default function EditPhoto() {
       <View style={styles.content}>
         <Photo photo={photo} style={styles.hero} />
 
+        <Pill
+          label={picking ? 'Opening library…' : 'Replace photo'}
+          icon={require('@assets/icons/camera.svg')}
+          tintIcons
+          onPress={picking ? undefined : replacePhoto}
+        />
+
         <View style={styles.tools}>
-          <Pill
-            label="Crop"
-            tone={tool === 'crop' ? 'selected' : 'default'}
-            onPress={() => setTool('crop')}
-          />
-          <Pill
-            label="Rotate"
-            tone={tool === 'rotate' ? 'selected' : 'default'}
-            onPress={() => setTool('rotate')}
-          />
+          <Pill label="Crop" tone={tool === 'crop' ? 'selected' : 'default'} onPress={() => setTool('crop')} />
+          <Pill label="Rotate" tone={tool === 'rotate' ? 'selected' : 'default'} onPress={() => setTool('rotate')} />
         </View>
         <Caption>
           {tool === 'crop'

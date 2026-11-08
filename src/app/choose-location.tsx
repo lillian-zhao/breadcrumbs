@@ -4,14 +4,26 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Button, Caption, Card, ListRow, PageHeader, Pill, Screen, SearchField, SectionHeading } from '@/components/ui';
 import { nearbyPlaces } from '@/data';
+import { usePlaceSearch } from '@/hooks/usePlaceSearch';
 import { colors, fonts, mapColors } from '@/theme';
+
+type Suggestion = { id: string; name: string; subtitle: string };
 
 export default function ChooseLocation() {
   const [query, setQuery] = useState('Cafe');
-  const [selectedId, setSelectedId] = useState(
-    nearbyPlaces.find((place) => place.status === 'selected')?.id ?? nearbyPlaces[0].id,
-  );
-  const selected = nearbyPlaces.find((place) => place.id === selectedId) ?? nearbyPlaces[0];
+  const { results, loading } = usePlaceSearch(query);
+
+  const suggestions: Suggestion[] =
+    results.length > 0
+      ? results.map((place) => ({
+          id: place.id,
+          name: place.name,
+          subtitle: place.address || place.category,
+        }))
+      : nearbyPlaces.map((place) => ({ id: place.id, name: place.name, subtitle: place.subtitle }));
+
+  const [selectedId, setSelectedId] = useState<string>(nearbyPlaces[0].id);
+  const selected = suggestions.find((s) => s.id === selectedId) ?? suggestions[0];
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
@@ -40,36 +52,30 @@ export default function ChooseLocation() {
           <View style={[styles.block, { left: 124, top: 94, backgroundColor: mapColors.block }]} />
           <View style={[styles.block, { left: 248, top: 94, backgroundColor: mapColors.block }]} />
           <View style={styles.cafeLabel}>
-            <Text style={styles.cafeName}>{selected.name}</Text>
+            <Text style={styles.cafeName}>{selected?.name ?? ''}</Text>
           </View>
         </View>
 
         <SectionHeading label="nearby places" fontSize={19} ruleOpacity={0.6} />
         <Card>
           <View style={styles.selectedHead}>
-            <Text style={styles.selectedName}>{selected.name}</Text>
-            <Pill label="Selected" tone="selected" />
+            <Text style={styles.selectedName}>{selected?.name ?? 'Pick a place'}</Text>
+            <Pill label={loading ? 'Searching…' : 'Selected'} tone="selected" />
           </View>
-          <Text style={styles.selectedSubtitle}>{selected.subtitle}</Text>
-          {selected.detail !== undefined && <Text style={styles.selectedDetail}>{selected.detail}</Text>}
+          {selected && <Text style={styles.selectedSubtitle}>{selected.subtitle}</Text>}
         </Card>
 
-        {nearbyPlaces
-          .filter((place) => place.id !== selected.id)
-          .map((place) => (
-            <ListRow
-              key={place.id}
-              title={place.name}
-              subtitle={place.subtitle}
-              actionLabel={place.status === 'added' ? 'Added' : 'Choose'}
-              onAction={place.status === 'choose' ? () => setSelectedId(place.id) : undefined}
-            />
+        {suggestions
+          .filter((s) => s.id !== selected?.id)
+          .map((s) => (
+            <ListRow key={s.id} title={s.name} subtitle={s.subtitle} actionLabel="Choose" onAction={() => setSelectedId(s.id)} />
           ))}
 
-        <Caption>Not the right spot? Search a place name or move the map to refine nearby results.</Caption>
+        {loading && <Caption>Searching places…</Caption>}
+        <Caption>Not the right spot? Search a place name to refine nearby results.</Caption>
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
-          <Button label={`Confirm ${selected.name}`} fill onPress={() => router.back()} />
+          <Button label={selected ? 'Confirm ' + selected.name : 'Confirm'} fill onPress={() => router.back()} />
         </View>
       </View>
     </Screen>
@@ -133,12 +139,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20.3,
     color: colors.caption,
-  },
-  selectedDetail: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    lineHeight: 17.4,
-    color: colors.ink,
   },
   actions: {
     flexDirection: 'row',

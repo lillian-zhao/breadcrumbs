@@ -4,22 +4,36 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Button, Caption, Card, ListRow, PageHeader, Pill, Screen, SearchField, SectionHeading } from '@/components/ui';
 import { nearbyPlaces } from '@/data';
+import { usePlaceSearch } from '@/hooks/usePlaceSearch';
 import { colors, fonts, mapColors } from '@/theme';
+
+type Suggestion = { id: string; name: string; subtitle: string };
 
 export default function EditLocation() {
   const { stop: stopParam } = useLocalSearchParams<{ stop?: string }>();
   const stopId = Array.isArray(stopParam) ? stopParam[0] : stopParam;
   const initial = nearbyPlaces.find((place) => place.id === stopId) ?? nearbyPlaces[0];
   const [query, setQuery] = useState(initial.name);
-  const [selectedId, setSelectedId] = useState(initial.id);
-  const selected = nearbyPlaces.find((place) => place.id === selectedId) ?? nearbyPlaces[0];
+  const { results, loading } = usePlaceSearch(query);
+
+  const suggestions: Suggestion[] =
+    results.length > 0
+      ? results.map((place) => ({
+          id: place.id,
+          name: place.name,
+          subtitle: place.address || place.category,
+        }))
+      : nearbyPlaces.map((place) => ({ id: place.id, name: place.name, subtitle: place.subtitle }));
+
+  const [selectedId, setSelectedId] = useState<string>(initial.id);
+  const selected = suggestions.find((s) => s.id === selectedId) ?? suggestions[0];
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <PageHeader
         back={{ label: 'Map' }}
         title={{ title: 'Move this pin.', fontSize: 44, lineHeight: 49.28 }}
-        subtitle={`Edit location · ${selected.name}`}
+        subtitle={'Edit location · ' + (selected?.name ?? '')}
         style={styles.header}
       />
 
@@ -41,7 +55,7 @@ export default function EditLocation() {
           <View style={[styles.block, { left: 124, top: 94, backgroundColor: mapColors.block }]} />
           <View style={[styles.block, { left: 248, top: 94, backgroundColor: mapColors.block }]} />
           <View style={styles.cafeLabel}>
-            <Text style={styles.cafeName}>{selected.name}</Text>
+            <Text style={styles.cafeName}>{selected?.name ?? ''}</Text>
             <Text style={styles.cafeHint}>Drag to refine</Text>
           </View>
         </View>
@@ -49,25 +63,19 @@ export default function EditLocation() {
         <SectionHeading label="suggested places" fontSize={19} ruleOpacity={0.6} />
         <Card>
           <View style={styles.selectedHead}>
-            <Text style={styles.selectedName}>{selected.name}</Text>
-            <Pill label="This pin" tone="selected" />
+            <Text style={styles.selectedName}>{selected?.name ?? 'Pick a place'}</Text>
+            <Pill label={loading ? 'Searching…' : 'This pin'} tone="selected" />
           </View>
-          <Text style={styles.selectedSubtitle}>{selected.subtitle}</Text>
-          {selected.detail !== undefined && <Text style={styles.selectedDetail}>{selected.detail}</Text>}
+          {selected && <Text style={styles.selectedSubtitle}>{selected.subtitle}</Text>}
         </Card>
 
-        {nearbyPlaces
-          .filter((place) => place.id !== selected.id)
-          .map((place) => (
-            <ListRow
-              key={place.id}
-              title={place.name}
-              subtitle={place.subtitle}
-              actionLabel="Use"
-              onAction={() => setSelectedId(place.id)}
-            />
+        {suggestions
+          .filter((s) => s.id !== selected?.id)
+          .map((s) => (
+            <ListRow key={s.id} title={s.name} subtitle={s.subtitle} actionLabel="Use" onAction={() => setSelectedId(s.id)} />
           ))}
 
+        {loading && <Caption>Searching places…</Caption>}
         <Caption>This only moves the pin on today’s trail. The original time and photos stay with the stop.</Caption>
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
@@ -141,12 +149,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20.3,
     color: colors.caption,
-  },
-  selectedDetail: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    lineHeight: 17.4,
-    color: colors.ink,
   },
   actions: {
     flexDirection: 'row',
