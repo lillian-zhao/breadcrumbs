@@ -3,14 +3,13 @@
  * Seed demo data into Breadcrumbs Firestore, or list existing users.
  * Requires firebase-admin (dev dependency) and a service-account key.
  *
- * Download the key: Firebase Console -> Project settings -> Service accounts ->
- * Generate new private key. Then run:
- *
  *   GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json node scripts/seed.js
  *   GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json node scripts/seed.js --list
  */
 
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 const path = require('path');
 
 const listOnly = process.argv.includes('--list');
@@ -23,12 +22,13 @@ if (!credentialsPath) {
 
 const serviceAccount = require(path.resolve(credentialsPath));
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+initializeApp({
+  credential: cert(serviceAccount),
   projectId: 'breadcrumbs-bc286',
 });
 
-const db = admin.firestore();
+const db = getFirestore();
+const auth = getAuth();
 
 async function listUsers() {
   const snap = await db.collection('users').get();
@@ -38,7 +38,7 @@ async function listUsers() {
     console.log('  ' + doc.id + '  ' + (d.name ?? '?') + '  ' + (d.handle ?? '') + '  ' + (d.email ?? ''));
   });
   try {
-    const authUsers = await admin.auth().listUsers(1000);
+    const authUsers = await auth.listUsers(1000);
     console.log('Firebase Auth accounts (' + authUsers.users.length + '):');
     authUsers.users.forEach((u) => {
       console.log('  ' + u.uid + '  ' + (u.displayName ?? '') + '  ' + (u.email ?? ''));
