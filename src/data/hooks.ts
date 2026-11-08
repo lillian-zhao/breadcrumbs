@@ -1,6 +1,6 @@
 import { getCurrentUserId, useAuthUser } from '@/api/auth';
 import { api } from '@/api/client';
-import type { FriendshipState, Preferences } from '@/api';
+import type { Audience, FriendshipState, Preferences } from '@/api';
 import { useAsync } from '@/hooks/useAsync';
 
 import { resolvePhoto, resolvePhotos } from './photos';
@@ -65,6 +65,22 @@ export function useFriendProfile(friendId: string) {
     ]);
     return { friend, status };
   }, [friendId, userId]);
+}
+
+export function usePeopleSearch(query: string) {
+  const userId = useCurrentUserId();
+  return useAsync(async (): Promise<Friend[]> => {
+    const results = await api.users.search(currentActor(), query);
+    return Promise.all(
+      results.map(async (user) => ({
+        id: user.id,
+        name: user.name,
+        handle: user.handle,
+        bio: user.bio,
+        avatar: await resolvePhoto(user.avatarPath),
+      })),
+    );
+  }, [userId, query]);
 }
 
 async function loadFriends(actor: Actor): Promise<FriendActivity[]> {
@@ -254,4 +270,15 @@ export function acceptFriend(requesterId: string) {
 
 export function unfriend(friendId: string) {
   return api.friends.unfriend(currentActor(), friendId);
+}
+
+export function createCrumb(input: {
+  placeName: string;
+  city: string;
+  visitedAt: Date;
+  note: string | null;
+  audience: Audience;
+  photoIds?: string[];
+}) {
+  return api.crumbs.create(currentActor(), input);
 }

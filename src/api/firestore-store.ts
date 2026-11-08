@@ -81,6 +81,21 @@ export const firestoreStore: DataStore = {
     await updateDoc(doc(db, 'users', userId), patch);
   },
 
+  async listUsers() {
+    const snap = await getDocs(collection(db, 'users'));
+    return snap.docs.map((s) => {
+      const d = s.data();
+      return {
+        id: s.id,
+        name: (d.name as string | undefined) ?? (d.username as string | undefined) ?? s.id,
+        handle: (d.handle as string | undefined) ?? '@' + s.id,
+        bio: (d.bio as string) ?? '',
+        avatarPath: (d.avatarPath as string | null | undefined) ?? null,
+        email: (d.email as string | null | undefined) ?? null,
+      };
+    });
+  },
+
   // ---- friendships -----------------------------------------------------
 
   async listFriendships(userId) {
@@ -146,6 +161,10 @@ export const firestoreStore: DataStore = {
     return snap.exists() ? crumbDoc(snap.id, snap.data()) : null;
   },
 
+  async setCrumb(crumbId, data) {
+    await setDoc(doc(db, 'crumbs', crumbId), data);
+  },
+
   // ---- photos ----------------------------------------------------------
 
   async getPhoto(photoId) {
@@ -153,6 +172,10 @@ export const firestoreStore: DataStore = {
     if (!snap.exists()) return null;
     const d = snap.data();
     return { storagePath: (d.storagePath as string | null | undefined) ?? null };
+  },
+
+  async setPhoto(photoId, data) {
+    await setDoc(doc(db, 'photos', photoId), data);
   },
 
   // ---- saved places ----------------------------------------------------

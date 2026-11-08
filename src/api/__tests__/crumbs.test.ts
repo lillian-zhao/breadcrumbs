@@ -100,3 +100,34 @@ describe('crumbs.weeks', () => {
     expect(weeks[0].dayKeys).toEqual(['2024-01-15', '2024-01-17']);
   });
 });
+
+describe('crumbs.create', () => {
+  it('writes a crumb and returns its id', async () => {
+    const s = new MemoryStore().user('alicia');
+    const api = createApi({ store: s });
+    const id = await api.crumbs.create(alicia, {
+      placeName: 'HeyTea',
+      city: 'Cambridge',
+      visitedAt: new Date(2024, 0, 15, 14),
+      note: 'Tea with friends',
+      audience: 'friends',
+      photoIds: [],
+    });
+    expect(id).toBeTruthy();
+    const crumbs = await s.listCrumbs('alicia');
+    expect(crumbs).toHaveLength(1);
+    expect(crumbs[0].placeName).toBe('HeyTea');
+    expect(crumbs[0].audience).toBe('friends');
+  });
+});
+
+describe('photos.add', () => {
+  it('records a photo path and returns its id', async () => {
+    const s = new MemoryStore().user('alicia');
+    const api = createApi({ store: s });
+    const id = await api.photos.add(alicia, 'photos/alicia/p1.jpg');
+    expect(id).toBeTruthy();
+    const photo = await s.getPhoto(id);
+    expect(photo?.storagePath).toBe('photos/alicia/p1.jpg');
+  });
+});

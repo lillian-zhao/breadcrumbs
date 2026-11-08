@@ -138,6 +138,10 @@ export class MemoryStore implements DataStore {
     this.users.set(userId, { ...existing, ...patch });
   }
 
+  async listUsers(): Promise<WithId<UserData>[]> {
+    return [...this.users.entries()].map(([id, data]) => ({ id, ...data }));
+  }
+
   // ---- friendships -----------------------------------------------------
 
   async listFriendships(userId: string): Promise<FriendshipData[]> {
@@ -196,10 +200,18 @@ export class MemoryStore implements DataStore {
     return data ? { id: crumbId, ...data } : null;
   }
 
+  async setCrumb(crumbId: string, data: CrumbData): Promise<void> {
+    this.crumbs.set(crumbId, { ...data });
+  }
+
   // ---- photos ----------------------------------------------------------
 
   async getPhoto(photoId: string): Promise<PhotoData | null> {
     return this.photos.get(photoId) ?? null;
+  }
+
+  async setPhoto(photoId: string, data: PhotoData): Promise<void> {
+    this.photos.set(photoId, { ...data });
   }
 
   // ---- saved places ----------------------------------------------------

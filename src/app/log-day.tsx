@@ -15,7 +15,7 @@ import {
   SectionHeading,
   TextField,
 } from '@/components/ui';
-import { currentUser, hasLoggedDay, todaysLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
+import { createCrumb, currentUser, hasLoggedDay, todaysLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
 import { colors, fonts } from '@/theme';
 
 const audienceHelp: Record<Audience, string> = {
@@ -58,6 +58,25 @@ export default function LogDay() {
   const [featured, ...otherStops] = todaysLog.stops;
   const attachedCount = todaysLog.photos.length;
   const dayLabel = formatLoggedDay(date);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await createCrumb({
+        placeName: featured?.name ?? 'A little stop',
+        city: todaysLog.location || 'Pittsburgh',
+        visitedAt: date,
+        note: note.trim() ? note.trim() : null,
+        audience,
+      });
+      router.back();
+    } catch (error) {
+      console.warn(error);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (fromCalendar && !logged && !composing) {
     return (
@@ -170,7 +189,7 @@ export default function LogDay() {
 
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
-          <Button label="Save day" fill onPress={() => router.back()} />
+          <Button label={saving ? 'Saving…' : 'Save day'} fill onPress={saving ? undefined : save} />
         </View>
       </View>
     </Screen>

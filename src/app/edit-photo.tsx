@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button, Caption, PageHeader, Photo, Pill, Screen, SectionHeading, TextField } from '@/components/ui';
 import { currentUser, todaysLog } from '@/data';
 import { pickImageFromLibrary } from '@/lib/image-picker';
+import { uploadPhoto } from '@/lib/upload';
 
 type Tool = 'crop' | 'rotate';
 
@@ -28,6 +29,24 @@ export default function EditPhoto() {
       if (picked) setPickedUri(picked.uri);
     } finally {
       setPicking(false);
+    }
+  };
+
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!pickedUri) {
+      router.back();
+      return;
+    }
+    setSaving(true);
+    try {
+      await uploadPhoto(pickedUri);
+      router.back();
+    } catch (error) {
+      console.warn(error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -76,7 +95,7 @@ export default function EditPhoto() {
 
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
-          <Button label={fromProfile ? 'Save photo' : 'Save to day'} fill onPress={() => router.back()} />
+          <Button label={saving ? 'Saving…' : fromProfile ? 'Save photo' : 'Save to day'} fill onPress={saving ? undefined : save} />
         </View>
       </View>
     </Screen>

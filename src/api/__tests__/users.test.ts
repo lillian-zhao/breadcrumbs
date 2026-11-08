@@ -60,3 +60,25 @@ describe('users.update', () => {
     expect(u?.name).toBe('Alicia C.');
   });
 });
+
+describe('users.search', () => {
+  it('finds users by name/handle/bio and excludes the actor', async () => {
+    const s = baseStore().user('priya', { name: 'Priya', handle: '@priya', bio: 'Clay dust' });
+    const api = createApi({ store: s });
+    const results = await api.users.search(alicia, 'priya');
+    expect(results.map((u) => u.id)).toEqual(['priya']);
+  });
+
+  it('returns all other users for an empty query', async () => {
+    const api = createApi({ store: baseStore() });
+    const results = await api.users.search(alicia, '');
+    expect(results.map((u) => u.id)).toEqual(['lillian']);
+  });
+
+  it('does not expose email addresses', async () => {
+    const s = baseStore().user('priya', { name: 'Priya', email: 'secret@example.com' });
+    const api = createApi({ store: s });
+    const results = await api.users.search(alicia, 'priya');
+    expect(results[0]).not.toHaveProperty('email');
+  });
+});

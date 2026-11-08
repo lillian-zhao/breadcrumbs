@@ -18,6 +18,8 @@ export type Permission =
   | 'profile:write'
   | 'friends:read'
   | 'crumbs:read'
+  | 'crumbs:write'
+  | 'photos:write'
   | 'places:read'
   | 'places:write'
   | 'albums:read'

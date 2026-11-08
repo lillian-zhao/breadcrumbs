@@ -22,7 +22,7 @@ import {
   getPerson,
   matchesPersonQuery,
   mutualLabel,
-  people,
+  usePeopleSearch,
 } from '@/data';
 
 type PeopleTab = 'followers' | 'following';
@@ -47,10 +47,7 @@ export default function People() {
     [followingIds, query],
   );
   const searching = query.trim().length > 0;
-  const searchResults = useMemo(
-    () => people.filter((person) => matchesPersonQuery(person, query)),
-    [query],
-  );
+  const { data: searchResults = [] } = usePeopleSearch(query);
   const familiarFaces = useMemo(
     () =>
       friends.filter(

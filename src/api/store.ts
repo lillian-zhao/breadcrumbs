@@ -111,6 +111,7 @@ export interface DataStore {
   getUser(userId: UserId): Promise<(UserData & { id: string }) | null>;
   setUser(userId: UserId, data: UserData): Promise<void>;
   updateUser(userId: UserId, patch: Partial<UserData>): Promise<void>;
+  listUsers(): Promise<(UserData & { id: string })[]>;
 
   // friendships (directed docs)
   listFriendships(userId: UserId): Promise<FriendshipData[]>;
@@ -130,9 +131,11 @@ export interface DataStore {
     opts?: { from?: Date; to?: Date },
   ): Promise<(CrumbData & { id: string })[]>;
   getCrumb(crumbId: string): Promise<(CrumbData & { id: string }) | null>;
+  setCrumb(crumbId: string, data: CrumbData): Promise<void>;
 
   // photos
   getPhoto(photoId: string): Promise<PhotoData | null>;
+  setPhoto(photoId: string, data: PhotoData): Promise<void>;
 
   // saved places
   listSavedPlaces(userId: UserId): Promise<(SavedPlaceData & { id: string })[]>;

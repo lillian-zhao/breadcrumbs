@@ -176,6 +176,19 @@ export function createApi(options: ApiOptions) {
       assert(actor, 'profile:write', { ownerId: actor.userId, relationship: 'self' });
       await store.updateUser(actor.userId, patch);
     },
+
+    /** Discover other users by name, handle or bio (excludes the actor). */
+    async search(actor: Actor, query: string): Promise<UserProfile[]> {
+      const needle = query.trim().toLowerCase();
+      const all = await store.listUsers();
+      return all
+        .filter((u) => {
+          if (u.id === actor.userId) return false;
+          if (!needle) return true;
+          return [u.name, u.handle, u.bio].some((v) => v.toLowerCase().includes(needle));
+        })
+        .map((u) => ({ id: u.id, name: u.name, handle: u.handle, bio: u.bio, avatarPath: u.avatarPath }));
+    },
   };
 
   // ---- friends ---------------------------------------------------------
@@ -311,6 +324,25 @@ export function createApi(options: ApiOptions) {
   // ---- crumbs ----------------------------------------------------------
 
   const crumbs = {
+    /** Create a crumb (one logged place visit) and return its id. */
+    async create(
+      actor: Actor,
+      input: { placeName: string; city: string; visitedAt: Date; note: string | null; audience: Audience; photoIds?: string[] },
+    ): Promise<string> {
+      assert(actor, 'crumbs:write', { ownerId: actor.userId, relationship: 'self' });
+      const id = 'crumb_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      await store.setCrumb(id, {
+        userId: actor.userId,
+        placeName: input.placeName,
+        city: input.city,
+        visitedAt: input.visitedAt,
+        note: input.note,
+        audience: input.audience,
+        photoIds: input.photoIds ?? [],
+      });
+      return id;
+    },
+
     /** A single day's aggregated log, derived from that day's crumbs. */
     async day(actor: Actor, userId: UserId, date: string): Promise<DayLog | null> {
       const all = await store.listCrumbs(userId);
@@ -467,6 +499,18 @@ export function createApi(options: ApiOptions) {
     },
   };
 
+  // ---- photos ----------------------------------------------------------
+
+  const photos = {
+    /** Record a photo's Storage path and return the photo id. */
+    async add(actor: Actor, storagePath: string): Promise<string> {
+      assert(actor, 'photos:write', { ownerId: actor.userId, relationship: 'self' });
+      const id = 'photo_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      await store.setPhoto(id, { storagePath });
+      return id;
+    },
+  };
+
   // ---- preferences -----------------------------------------------------
 
   const preferences = {
@@ -506,7 +550,7 @@ export function createApi(options: ApiOptions) {
     },
   };
 
-  return { users, friends, crumbs, places, gallery, preferences, accounts };
+  return { users, friends, crumbs, places, gallery, photos, preferences, accounts };
 }
 
 export type BreadcrumbsApi = ReturnType<typeof createApi>;
