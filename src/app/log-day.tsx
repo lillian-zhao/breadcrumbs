@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { formatLoggedDay, parseDayParam } from '@/components/calendar';
@@ -16,6 +16,7 @@ import {
   TextField,
 } from '@/components/ui';
 import { createCrumb, useCurrentUser, useDayLog, type Audience, type Photo as PhotoData, type Stop } from '@/data';
+import { clearPendingPhotos, getPendingPhotos, type PendingPhoto } from '@/lib/pending-photos';
 import { colors, fonts } from '@/theme';
 
 const audienceHelp: Record<Audience, string> = {
@@ -55,12 +56,27 @@ export default function LogDay() {
   const [noteEdit, setNoteEdit] = useState<string>();
   const [audienceEdit, setAudienceEdit] = useState<Audience>();
   const [saving, setSaving] = useState(false);
+  const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setPendingPhotos(getPendingPhotos());
+    }, []),
+  );
+
+  useEffect(
+    () => () => {
+      clearPendingPhotos();
+    },
+    [],
+  );
 
   const note = noteEdit ?? dayLog?.note ?? '';
   const audience = audienceEdit ?? dayLog?.audience ?? 'private';
   const stops = dayLog?.stops ?? [];
   const [featured, ...otherStops] = stops;
   const photos = dayLog?.photos ?? [];
+  const allPhotos: PhotoData[] = [...photos, ...pendingPhotos.map((p) => ({ source: { uri: p.uri } }))];
   const location = dayLog?.location ?? '';
   const dayLabel = formatLoggedDay(date);
 
@@ -73,7 +89,10 @@ export default function LogDay() {
         visitedAt: date,
         note: note.trim() ? note.trim() : null,
         audience,
+        photoIds: pendingPhotos.map((p) => p.photoId),
       });
+      clearPendingPhotos();
+      setPendingPhotos([]);
       router.back();
     } catch (error) {
       console.warn(error);
@@ -140,7 +159,7 @@ export default function LogDay() {
         />
 
         <SectionHeading label="little moments" fontSize={19} ruleOpacity={0.6} />
-        {photos.length === 0 ? (
+        {allPhotos.length === 0 ? (
           <Button
             label="Add photo"
             variant="secondary"
@@ -149,7 +168,7 @@ export default function LogDay() {
           />
         ) : (
           <View style={styles.moments}>
-            <Photo photo={photos[0]} style={styles.momentPhoto} />
+            <Photo photo={allPhotos[0]} style={styles.momentPhoto} />
             <View style={styles.photoAction}>
               <Button
                 label="Add photo"
@@ -158,7 +177,7 @@ export default function LogDay() {
                 onPress={() => router.push('/edit-photo' as Href)}
               />
               <Text style={styles.caption}>
-                {photos.length} photo{photos.length === 1 ? '' : 's'} attached · Preview to edit
+                {allPhotos.length} photo{allPhotos.length === 1 ? '' : 's'} attached · Preview to edit
               </Text>
             </View>
           </View>
@@ -193,7 +212,7 @@ export default function LogDay() {
         <Text style={styles.caption}>{audienceHelp[audience]}</Text>
 
         <View style={styles.actions}>
-          <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
+          <Button label="Cancel" variant="secondary" fill onPress={() => { clearPendingPhotos(); router.back(); }} />
           <Button label={saving ? 'Saving…' : 'Save day'} fill onPress={saving ? undefined : save} />
         </View>
       </View>

@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button, Caption, PageHeader, Photo, Pill, Screen, SectionHeading, TextField } from '@/components/ui';
 import { currentUser, todaysLog } from '@/data';
 import { pickImageFromLibrary } from '@/lib/image-picker';
+import { addPendingPhoto } from '@/lib/pending-photos';
 import { uploadPhoto } from '@/lib/upload';
 
 type Tool = 'crop' | 'rotate';
@@ -41,7 +42,8 @@ export default function EditPhoto() {
     }
     setSaving(true);
     try {
-      await uploadPhoto(pickedUri);
+      const { photoId } = await uploadPhoto(pickedUri);
+      if (!fromProfile) addPendingPhoto(photoId, pickedUri);
       router.back();
     } catch (error) {
       console.warn(error);

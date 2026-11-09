@@ -11,7 +11,8 @@ import { storage } from '@/api/firebase';
 export async function uploadPhoto(uri: string): Promise<{ photoId: string; storagePath: string }> {
   const response = await fetch(uri);
   const blob = await response.blob();
-  const storagePath = 'photos/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  const userId = getCurrentUserId() ?? 'anonymous';
+  const storagePath = 'photos/' + userId + '/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
   await uploadBytes(ref(storage, storagePath), blob);
   const photoId = await api.photos.add({ userId: getCurrentUserId() ?? '' }, storagePath);
   return { photoId, storagePath };
