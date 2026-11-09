@@ -1,42 +1,71 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
+import { formatLoggedDay, toDayParam } from '@/components/calendar';
+import { DayMap } from '@/components/DayMap';
 import { Button, Caption, Card, ListRow, PageHeader, Photo, Pill, Screen, SectionHeading } from '@/components/ui';
-import { currentUser, friendWeeks, getPerson, weeklyHighlights, weeklyWrapped } from '@/data';
-import { colors, fonts, mapColors, radii } from '@/theme';
+import { emptyPhoto, useCurrentUser, useWeeklyCrumbs } from '@/data';
+import type { WeeklyCrumb } from '@/data';
+import { colors, fonts, radii } from '@/theme';
 
 const collageHeights = [156, 108, 108, 156] as const;
+
+function dateFromKey(key: string) {
+  const [year, month, day] = key.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function weekLabel(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  const monthStart = start.toLocaleDateString('en-US', { month: 'short' });
+  const monthEnd = end.toLocaleDateString('en-US', { month: 'short' });
+  return `${monthStart} ${start.getDate()} – ${sameMonth ? '' : `${monthEnd} `}${end.getDate()}, ${end.getFullYear()}`;
+}
+
+function groupByDay(crumbs: WeeklyCrumb[]) {
+  const groups = new Map<string, WeeklyCrumb[]>();
+  for (const crumb of crumbs) {
+    const key = `${crumb.visitedAt.getFullYear()}-${String(crumb.visitedAt.getMonth() + 1).padStart(2, '0')}-${String(crumb.visitedAt.getDate()).padStart(2, '0')}`;
+    groups.set(key, [...(groups.get(key) ?? []), crumb]);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
 
 export default function WeeklyWrapped() {
   const { friend: friendParam } = useLocalSearchParams<{ friend?: string }>();
   const friendId = Array.isArray(friendParam) ? friendParam[0] : friendParam;
-  const friend = friendId ? getPerson(friendId) : undefined;
-  const week = friend ? friendWeeks.find((item) => item.friendId === friend.id) : undefined;
-  const title = friend ? `${friend.name}’s week.` : 'Your week.';
-  const spots = week?.places ?? 6;
-  const discoveries = week?.newPlaces ?? 2;
+  const { data: currentUser } = useCurrentUser();
+  const { data: crumbs = [], loading } = useWeeklyCrumbs(friendId);
+  const groups = groupByDay(crumbs);
+  const placeNames = new Set(crumbs.map((crumb) => crumb.placeName.trim().toLowerCase()));
+  const mapCrumbs = crumbs.filter((crumb): crumb is WeeklyCrumb & { latitude: number; longitude: number } =>
+    typeof crumb.latitude === 'number' && typeof crumb.longitude === 'number',
+  );
+  const heroPhotos = crumbs.flatMap((crumb) => crumb.photo ? [crumb.photo] : []).slice(0, 4);
+  const title = friendId ? 'Their week.' : 'Your week.';
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <PageHeader
-        back={{ label: friend ? 'Back' : 'Home' }}
+        back={{ label: friendId ? 'Back' : 'Home' }}
         title={{ title, fontSize: 44, lineHeight: 49.28 }}
-        subtitle={friend ? `${friend.name} · A shared recap` : 'A little look back · Sep 28 – Oct 4, 2026'}
+        subtitle={`${friendId ? 'A shared recap' : 'A little look back'} · ${weekLabel()}`}
         style={styles.header}
       />
 
       <View style={styles.content}>
-        <Pill label="Sample recap · illustrative totals" />
+        <Pill label={loading ? 'Gathering this week’s crumbs' : `${crumbs.length} crumb${crumbs.length === 1 ? '' : 's'} this week`} />
 
-        <View style={styles.collage}>
-          <View style={styles.strip}>
-            <Photo photo={weeklyWrapped[0]} style={{ height: collageHeights[0] }} />
-            <Photo photo={weeklyWrapped[2]} style={{ height: collageHeights[2] }} />
-          </View>
-          <View style={styles.strip}>
-            <Photo photo={weeklyWrapped[1]} style={{ height: collageHeights[1] }} />
-            <Photo photo={weeklyWrapped[3]} style={{ height: collageHeights[3] }} />
-          </View>
+        <View style={styles.collage} accessibilityLabel="Images attached to this week's crumbs">
+          {[0, 1].map((column) => (
+            <View key={column} style={styles.strip}>
+              {[column, column + 2].map((index) => (
+                <Photo key={index} photo={heroPhotos[index] ?? emptyPhoto} style={{ height: collageHeights[index] }} />
+              ))}
+            </View>
+          ))}
         </View>
 
         <Text style={styles.headline}>The ordinary, remembered.</Text>
@@ -44,157 +73,74 @@ export default function WeeklyWrapped() {
         <Card>
           <View style={styles.metrics}>
             <View style={styles.metric}>
-              <Text style={styles.metricValue}>{spots}</Text>
-              <Text style={styles.metricLabel}>visited spots</Text>
+              <Text style={styles.metricValue}>{crumbs.length}</Text>
+              <Text style={styles.metricLabel}>crumbs</Text>
             </View>
             <View style={styles.metric}>
-              <Text style={styles.metricValue}>{discoveries}</Text>
-              <Text style={styles.metricLabel}>new discoveries</Text>
+              <Text style={styles.metricValue}>{placeNames.size}</Text>
+              <Text style={styles.metricLabel}>places</Text>
             </View>
             <View style={styles.metric}>
-              <Text style={styles.metricValue}>4</Text>
+              <Text style={styles.metricValue}>{groups.length}</Text>
               <Text style={styles.metricLabel}>days kept</Text>
             </View>
           </View>
         </Card>
 
-        <SectionHeading label="day highlights" fontSize={19} ruleOpacity={0.6} />
-        {weeklyHighlights.map((highlight) => (
+        <SectionHeading label="crumbs from your week" fontSize={19} ruleOpacity={0.6} />
+        {groups.length === 0 ? (
+          <Card><Caption>{loading ? 'Loading your crumbs…' : 'No crumbs logged this week yet.'}</Caption></Card>
+        ) : groups.map(([key, dayCrumbs]) => (
           <ListRow
-            key={highlight.title}
-            title={highlight.title}
-            subtitle={highlight.subtitle}
-            actionLabel={highlight.actionLabel}
-            onAction={() => router.push(highlight.href as Href)}
+            key={key}
+            title={dayCrumbs.map((crumb) => crumb.placeName).join(' · ')}
+            subtitle={`${formatLoggedDay(dateFromKey(key))} · ${dayCrumbs.length} crumb${dayCrumbs.length === 1 ? '' : 's'}`}
+            actionLabel="View day"
+            onAction={() => router.push((`/log-day?date=${toDayParam(dateFromKey(key))}`) as Href)}
           />
         ))}
 
         <SectionHeading label="places in your week" fontSize={19} ruleOpacity={0.6} />
-        <View style={styles.map} accessibilityLabel="Pittsburgh places from this week">
-          <Text style={styles.mapCity}>PITTSBURGH</Text>
-          <View style={[styles.block, { left: 0, top: 0, width: 110, height: 80 }]} />
-          <View style={[styles.block, { left: 124, top: 0, width: 110, height: 80 }]} />
-          <View style={[styles.block, { left: 248, top: 0, width: 110, height: 80 }]} />
-          <View style={[styles.park, { left: 0, top: 94, width: 110, height: 96 }]} />
-          <View style={[styles.block, { left: 124, top: 94, width: 110, height: 96 }]} />
-          <View style={[styles.block, { left: 248, top: 94, width: 110, height: 96 }]} />
-          <View style={styles.trail} />
-          <View style={[styles.mapLabel, { left: 26, top: 50 }]}>
-            <Text style={styles.mapLabelText}>Cafe</Text>
-          </View>
-          <View style={[styles.mapLabel, { left: 196, top: 126 }]}>
-            <Text style={styles.mapLabelText}>Morning walk</Text>
-          </View>
+        <View style={styles.map}>
+          {Platform.OS === 'ios' || Platform.OS === 'android' ? (
+            <DayMap variant="mine" crumbs={mapCrumbs} />
+          ) : (
+            <View style={styles.webMapFallback}>
+              <Text style={styles.fallbackTitle}>PLACES THIS WEEK</Text>
+              <Text style={styles.fallbackPlaces}>{mapCrumbs.map((crumb) => crumb.placeName).join(' · ') || 'No mapped crumbs this week'}</Text>
+            </View>
+          )}
         </View>
-        <Caption>
-          An illustrative summary of your places, not a live location trail. Your full days stay in your journal.
-        </Caption>
+        {mapCrumbs.length !== crumbs.length && <Caption>Some crumbs don’t have map coordinates yet.</Caption>}
 
         <Button
           label="Share this wrapped"
           icon={require('@assets/icons/share.svg')}
-          onPress={() => router.push((friend ? `/share?friend=${friend.id}` : '/share') as Href)}
+          onPress={() => router.push((friendId ? `/share?friend=${friendId}` : '/share') as Href)}
         />
         <Button
-          label={friend ? `Back to ${friend.name}` : 'Back to Home'}
+          label={friendId ? 'Back' : 'Back to Home'}
           variant="secondary"
-          onPress={() => (friend ? router.back() : router.replace('/' as Href))}
+          onPress={() => (friendId ? router.back() : router.replace('/' as Href))}
         />
-        {!friend && (
-          <Caption align="center">
-            {currentUser.name}’s week · private until you choose to share.
-          </Caption>
-        )}
+        {!friendId && <Caption align="center">{currentUser?.name ?? 'Your'} week · private until you choose to share.</Caption>}
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginBottom: 24,
-  },
-  content: {
-    gap: 22,
-  },
-  collage: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  strip: {
-    flex: 1,
-    gap: 6,
-  },
-  headline: {
-    fontFamily: fonts.display,
-    fontSize: 32,
-    lineHeight: 37.76,
-    color: colors.ink,
-  },
-  metrics: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  metric: {
-    flex: 1,
-    gap: 4,
-  },
-  metricValue: {
-    fontFamily: fonts.display,
-    fontSize: 34,
-    lineHeight: 40,
-    color: colors.ink,
-  },
-  metricLabel: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    lineHeight: 17.4,
-    color: colors.ink,
-  },
-  map: {
-    height: 190,
-    overflow: 'hidden',
-    borderRadius: radii.control,
-    backgroundColor: mapColors.street,
-  },
-  mapCity: {
-    position: 'absolute',
-    left: 14,
-    top: 14,
-    zIndex: 2,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    color: colors.bark,
-  },
-  block: {
-    position: 'absolute',
-    backgroundColor: mapColors.block,
-  },
-  park: {
-    position: 'absolute',
-    backgroundColor: mapColors.park,
-  },
-  trail: {
-    position: 'absolute',
-    left: 70,
-    top: 70,
-    width: 160,
-    height: 70,
-    borderWidth: 2,
-    borderColor: colors.crumb,
-    borderStyle: 'dashed',
-    borderRightWidth: 0,
-    borderTopWidth: 0,
-  },
-  mapLabel: {
-    position: 'absolute',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: colors.cream,
-  },
-  mapLabelText: {
-    fontFamily: fonts.display,
-    fontSize: 13,
-    color: colors.ink,
-  },
+  header: { marginBottom: 24 },
+  content: { gap: 22 },
+  collage: { flexDirection: 'row', gap: 6 },
+  strip: { flex: 1, gap: 6 },
+  headline: { fontFamily: fonts.display, fontSize: 32, lineHeight: 37.76, color: colors.ink },
+  metrics: { flexDirection: 'row', gap: 16 },
+  metric: { flex: 1, gap: 4 },
+  metricValue: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.ink },
+  metricLabel: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17.4, color: colors.ink },
+  map: { height: 230, overflow: 'hidden', borderRadius: radii.control, backgroundColor: colors.paper },
+  webMapFallback: { flex: 1, justifyContent: 'center', gap: 12, padding: 20, borderRadius: radii.control, backgroundColor: colors.track },
+  fallbackTitle: { fontFamily: fonts.body, fontSize: 10, color: colors.bark },
+  fallbackPlaces: { fontFamily: fonts.display, fontSize: 18, lineHeight: 24, color: colors.ink },
 });

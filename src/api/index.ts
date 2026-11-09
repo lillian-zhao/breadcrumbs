@@ -57,6 +57,19 @@ function localDateKey(d: Date, timeZone?: string): string {
   }).format(d);
 }
 
+/** Inclusive local-time bounds for a YYYY-MM-DD date, including DST changes. */
+function localDayBounds(date: string): { from: Date; to: Date } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const from = new Date(year, month, day);
+  if (from.getFullYear() !== year || from.getMonth() !== month || from.getDate() !== day) return null;
+  const nextDay = new Date(year, month, day + 1);
+  return { from, to: new Date(nextDay.getTime() - 1) };
+}
+
 /** Sunday of the week containing a YYYY-MM-DD key. */
 function sundayOf(dateKey: string): string {
   const d = new Date(dateKey + 'T00:00:00Z');
@@ -340,7 +353,7 @@ export function createApi(options: ApiOptions) {
     ): Promise<string> {
       assert(actor, 'crumbs:write', { ownerId: actor.userId, relationship: 'self' });
       const id = 'crumb_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-      await store.setCrumb(id, {
+      const data: CrumbData = {
         userId: actor.userId,
         placeName: input.placeName,
         city: input.city,
@@ -350,7 +363,10 @@ export function createApi(options: ApiOptions) {
         photoIds: input.photoIds ?? [],
         latitude: input.latitude ?? null,
         longitude: input.longitude ?? null,
-      });
+      };
+      console.log('[API request] crumbs.create', { actorUserId: actor.userId, crumbId: id, data });
+      await store.setCrumb(id, data);
+      console.log('[API response] crumbs.create', { crumbId: id });
       return id;
     },
 
@@ -365,7 +381,9 @@ export function createApi(options: ApiOptions) {
 
     /** A single day's aggregated log, derived from that day's crumbs. */
     async day(actor: Actor, userId: UserId, date: string): Promise<DayLog | null> {
-      const all = await store.listCrumbs(userId);
+      const bounds = localDayBounds(date);
+      if (!bounds) return null;
+      const all = await store.listCrumbs(userId, bounds);
       const matches = all
         .filter((c) => localDateKey(c.visitedAt) === date)
         .sort((a, b) => a.visitedAt.getTime() - b.visitedAt.getTime());
@@ -374,10 +392,13 @@ export function createApi(options: ApiOptions) {
       const rel = await relationship(actor, userId);
       const audience: Audience = matches.some((c) => c.audience === 'friends') ? 'friends' : 'private';
       assert(actor, 'crumbs:read', { ownerId: userId, relationship: rel, audience });
+      // A shared crumb makes the day available to friends, but private crumbs
+      // from that same day must still stay hidden from them.
+      const visibleMatches = rel === 'friend' ? matches.filter((c) => c.audience === 'friends') : matches;
 
       const stops: DayStop[] = [];
       const photos: CrumbPhoto[] = [];
-      for (const c of matches) {
+      for (const c of visibleMatches) {
         const firstPhotoId = c.photoIds[0];
         const photo = firstPhotoId ? await toPhoto(firstPhotoId) : null;
         stops.push({
@@ -393,10 +414,10 @@ export function createApi(options: ApiOptions) {
 
       return {
         date,
-        location: matches[0].city,
+        location: visibleMatches[0].city,
         stops,
         photos,
-        note: matches.find((c) => c.note)?.note ?? null,
+        note: visibleMatches.find((c) => c.note)?.note ?? null,
         audience,
       };
     },
@@ -525,8 +546,10 @@ export function createApi(options: ApiOptions) {
     /** Record a photo's Storage path and return the photo id. */
     async add(actor: Actor, storagePath: string): Promise<string> {
       assert(actor, 'photos:write', { ownerId: actor.userId, relationship: 'self' });
+      console.log('[API request] photos.add', { actorUserId: actor.userId, storagePath });
       const id = 'photo_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       await store.setPhoto(id, { storagePath });
+      console.log('[API response] photos.add', { photoId: id, storagePath });
       return id;
     },
   };

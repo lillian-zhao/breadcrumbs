@@ -1,4 +1,4 @@
-/** A photo uploaded during the current "log a day" composing session. */
+/** A photo uploaded during the current crumb composing session. */
 export type PendingPhoto = {
   photoId: string;
   /** Local uri used for an immediate preview before the day is saved. */
@@ -7,7 +7,7 @@ export type PendingPhoto = {
 
 let pending: PendingPhoto[] = [];
 
-/** Remember a photo uploaded while composing a day, until it is attached to a crumb. */
+/** Keep an uploaded photo in the current composer until its crumb is saved. */
 export function addPendingPhoto(photoId: string, uri: string) {
   pending.push({ photoId, uri });
 }

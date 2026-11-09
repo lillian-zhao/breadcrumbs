@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useConnections } from '@/connections';
 import {
-  Avatar,
   Button,
   Divider,
   PersonRow,
@@ -29,11 +28,9 @@ export default function Friends() {
   const { data: highlights = [] } = useHighlights();
   const [query, setQuery] = useState('');
   const { data: peopleResults = [] } = usePeopleSearch(query);
-  const [selectedFriendId, setSelectedFriendId] = useState<string>();
-  const { isFollowing, isRequested, toggleFollow } = useConnections();
+  const { isFollowing, isRequested, toggleFollow, incoming, accept } = useConnections();
 
   const searching = query.trim().length > 0;
-  const selectedId = selectedFriendId ?? friends[0]?.id;
 
   const visibleFriends = useMemo(
     () => friends.filter((friend) => matchesFriend(friend, query)),
@@ -81,26 +78,37 @@ export default function Friends() {
           </>
         ) : (
           <>
+            {incoming.length > 0 && (
+              <View style={styles.suggestions}>
+                <SectionHeading label={`friend requests · ${incoming.length}`} fontSize={19} ruleOpacity={0.6} />
+                {incoming.map((request) => (
+                  <PersonRow
+                    key={request.id}
+                    name={request.name}
+                    subtitle={`${request.handle} · Requested to connect`}
+                    photo={request.avatar}
+                    actionLabel="Accept"
+                    onAction={() => { void accept(request.id); }}
+                    onPress={() => router.push('/friend/' + request.id as Href)}
+                  />
+                ))}
+              </View>
+            )}
             {visibleFriends.length > 0 && (
-              <View style={styles.friendSelector}>
-                {visibleFriends.map((friend) => {
-                  const isSelected = friend.id === selectedId;
-                  return (
-                    <Pressable
-                      key={friend.id}
-                      style={styles.friend}
-                      onPress={() => {
-                        setSelectedFriendId(friend.id);
-                        router.push('/friend/' + friend.id as Href);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                    >
-                      <Avatar photo={friend.avatar} size={64} ringColor={isSelected ? colors.crumb : colors.sand} />
-                      <Text style={[styles.friendName, isSelected && styles.friendNameSelected]}>{friend.name}</Text>
-                    </Pressable>
-                  );
-                })}
+              <View style={styles.suggestions}>
+                <SectionHeading label={`your friends · ${visibleFriends.length}`} fontSize={19} ruleOpacity={0.6} />
+                {visibleFriends.map((friend) => (
+                  <PersonRow
+                    key={friend.id}
+                    name={friend.name}
+                    subtitle={`${friend.handle} · ${friend.places} places`}
+                    photo={friend.avatar}
+                    actionLabel="Following"
+                    actionSelected
+                    onAction={() => toggleFollow(friend.id)}
+                    onPress={() => router.push('/friend/' + friend.id as Href)}
+                  />
+                ))}
               </View>
             )}
 
@@ -174,24 +182,6 @@ const styles = StyleSheet.create({
   feed: {
     paddingTop: 24,
     gap: 28,
-  },
-  friendSelector: {
-    flexDirection: 'row',
-    gap: 18,
-  },
-  friend: {
-    width: 63,
-    height: 94,
-    alignItems: 'center',
-    gap: 8,
-  },
-  friendName: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.bark,
-  },
-  friendNameSelected: {
-    color: colors.crumb,
   },
   recommendations: {
     width: 352,

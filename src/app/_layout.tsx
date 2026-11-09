@@ -35,6 +35,7 @@ function RootNavigator() {
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}>
       <Stack.Protected guard={!!session} redirectTo={'/sign-in' as Href}>
+        <Stack.Screen name="add-crumb" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="blocked" />
         <Stack.Screen name="calendar" />

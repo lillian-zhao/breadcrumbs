@@ -12,8 +12,9 @@ const urlCache = new Map<string, Promise<string | null>>();
 function downloadUrl(path: string): Promise<string | null> {
   let url = urlCache.get(path);
   if (!url) {
-    url = getDownloadURL(ref(storage, path)).catch(() => {
+    url = getDownloadURL(ref(storage, path)).catch((error: unknown) => {
       // Missing objects are expected in seeded data; fall back to an empty frame.
+      console.warn('Could not read Firebase Storage photo at ' + path, error);
       urlCache.delete(path);
       return null;
     });

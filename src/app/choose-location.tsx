@@ -1,16 +1,20 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { LocationMap } from '@/components/LocationMap';
+import { formatLoggedDay, parseDayParam } from '@/components/calendar';
 import { Button, Caption, Card, ListRow, PageHeader, Pill, Screen, SearchField, SectionHeading } from '@/components/ui';
-import { createCrumb, nearbyPlaces } from '@/data';
+import { nearbyPlaces } from '@/data';
 import { usePlaceSearch } from '@/hooks/usePlaceSearch';
+import { setPendingLocation } from '@/lib/pending-location';
 import { colors, fonts } from '@/theme';
 
 type Suggestion = { id: string; name: string; subtitle: string; latitude?: number; longitude?: number };
 
 export default function ChooseLocation() {
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const selectedDay = parseDayParam(dateParam) ?? new Date();
   const [query, setQuery] = useState('Cafe');
   const { results, loading } = usePlaceSearch(query);
 
@@ -27,35 +31,27 @@ export default function ChooseLocation() {
 
   const [selectedId, setSelectedId] = useState<string>(nearbyPlaces[0].id);
   const selected = suggestions.find((s) => s.id === selectedId) ?? suggestions[0];
-  const [saving, setSaving] = useState(false);
-
-  const confirm = async () => {
+  const confirm = () => {
     if (!selected) return;
-    setSaving(true);
-    try {
-      await createCrumb({
-        placeName: selected.name,
-        city: 'Pittsburgh',
-        visitedAt: new Date(),
-        note: null,
-        audience: 'private',
-        latitude: selected.latitude ?? null,
-        longitude: selected.longitude ?? null,
-      });
-      router.back();
-    } catch (error) {
-      console.warn(error);
-    } finally {
-      setSaving(false);
-    }
+    const visitedAt = new Date(selectedDay);
+    const now = new Date();
+    visitedAt.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    setPendingLocation({
+      placeName: selected.name,
+      city: 'Pittsburgh',
+      visitedAt,
+      latitude: selected.latitude ?? null,
+      longitude: selected.longitude ?? null,
+    });
+    router.back();
   };
 
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <PageHeader
-        back={{ label: 'Log a Day' }}
+        back={{ label: 'Add a Crumb' }}
         title={{ title: 'A little stop', fontSize: 44, lineHeight: 49.28 }}
-        subtitle="Add a place to Today, Oct 5"
+        subtitle={'Add a place to ' + formatLoggedDay(selectedDay)}
         style={styles.header}
       />
 
@@ -94,7 +90,7 @@ export default function ChooseLocation() {
         <Caption>Not the right spot? Search a place name to refine nearby results.</Caption>
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
-          <Button label={saving ? 'Saving…' : selected ? 'Confirm ' + selected.name : 'Confirm'} fill onPress={saving ? undefined : confirm} />
+          <Button label={selected ? 'Use ' + selected.name : 'Choose location'} fill onPress={confirm} />
         </View>
       </View>
     </Screen>

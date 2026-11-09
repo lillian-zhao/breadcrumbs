@@ -42,7 +42,7 @@ export default function MapScreen() {
         <DayMap
           variant={view === 'friends' ? 'friends' : 'mine'}
           onSelectPin={(id) => {
-            if (view === 'friends') router.push(`/map-day/${id}` as Href);
+            if (view === 'friends') router.push(`/crumb/${id}` as Href);
             else router.push(`/edit-location?stop=${id}` as Href);
           }}
         />

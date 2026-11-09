@@ -164,7 +164,14 @@ export const firestoreStore: DataStore = {
   },
 
   async setCrumb(crumbId, data) {
-    await setDoc(doc(db, 'crumbs', crumbId), data);
+    const path = 'crumbs/' + crumbId;
+    console.log('[Firestore write request]', {
+      projectId: db.app.options.projectId,
+      path,
+      data,
+    });
+    await setDoc(doc(db, path), data);
+    console.log('[Firestore write accepted]', { projectId: db.app.options.projectId, path });
   },
 
   // ---- photos ----------------------------------------------------------
@@ -177,7 +184,14 @@ export const firestoreStore: DataStore = {
   },
 
   async setPhoto(photoId, data) {
-    await setDoc(doc(db, 'photos', photoId), data);
+    const path = 'photos/' + photoId;
+    console.log('[Firestore write request]', {
+      projectId: db.app.options.projectId,
+      path,
+      data,
+    });
+    await setDoc(doc(db, path), data);
+    console.log('[Firestore write accepted]', { projectId: db.app.options.projectId, path });
   },
 
   // ---- saved places ----------------------------------------------------

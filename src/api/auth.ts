@@ -35,7 +35,9 @@ export function getCurrentUser(): User | null {
 
 /** The current signed-in user id, or null when signed out. */
 export function getCurrentUserId(): string | null {
-  return currentUser?.uid ?? null;
+  // `onAuthStateChanged` can deliver its first event after a screen starts an
+  // upload. Firebase's synchronous currentUser is already available then.
+  return currentUser?.uid ?? auth.currentUser?.uid ?? null;
 }
 
 /** React hook that re-renders when auth state changes. */

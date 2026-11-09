@@ -1,5 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
 
+/** Lower compression quality to keep uploaded photo storage use small. */
+export const PHOTO_COMPRESSION_QUALITY = 0.35;
+
 /** Result of picking an image from the device library. */
 export type PickedImage = {
   uri: string;
@@ -20,7 +23,7 @@ export async function pickImageFromLibrary(): Promise<PickedImage | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: true,
-    quality: 0.8,
+    quality: PHOTO_COMPRESSION_QUALITY,
   });
 
   if (result.canceled || !result.assets || result.assets.length === 0) {

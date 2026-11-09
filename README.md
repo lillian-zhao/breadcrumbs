@@ -166,3 +166,9 @@ Static checks:
 npx tsc --noEmit   # typecheck
 npx expo lint      # lint
 ~~~
+# Firebase Storage rules
+
+Deploy the rules in [`storage.rules`](./storage.rules) to Firebase Console →
+Storage → Rules for the `breadcrumbs-bc286` bucket. They allow signed-in users
+to read photos used by shared crumbs and profiles, and allow each user to
+upload image files only into their own `photos/{uid}/` folder (up to 20 MB).

@@ -36,7 +36,7 @@ export default function People() {
   const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<PeopleTab>(() => asTab(tabParam));
   const [query, setQuery] = useState('');
-  const { isFollowing, isRequested, toggleFollow, followingIds } = useConnections();
+  const { isFollowing, isRequested, toggleFollow, followingIds, incoming, accept } = useConnections();
 
   const followers = useMemo(
     () => followerIds.map(getPerson).filter((person) => person && matchesPersonQuery(person, query)),
@@ -94,6 +94,23 @@ export default function People() {
         </View>
 
         <SearchField value={query} onChangeText={setQuery} placeholder="Search people" />
+
+        {incoming.length > 0 && (
+          <>
+            <SectionHeading label={`friend requests · ${incoming.length}`} fontSize={19} ruleOpacity={0.6} />
+            {incoming.map((request) => (
+              <PersonRow
+                key={request.id}
+                name={request.name}
+                subtitle={`${request.handle} · Requested to connect`}
+                photo={request.avatar}
+                actionLabel="Accept"
+                onAction={() => { void accept(request.id); }}
+                onPress={() => router.push(`/friend/${request.id}` as Href)}
+              />
+            ))}
+          </>
+        )}
 
         {searching ? (
           <>

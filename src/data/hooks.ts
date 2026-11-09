@@ -140,6 +140,57 @@ export type MapCrumb = {
   visitedAt: Date;
 };
 
+export type FriendMapCrumb = MapCrumb & { friendId: string; friendName: string };
+
+export type WeeklyCrumb = Omit<MapCrumb, 'latitude' | 'longitude'> & {
+  latitude: number | null;
+  longitude: number | null;
+  photo?: Photo;
+};
+
+function weekBounds(now: Date) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const keys: string[] = [];
+  for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) keys.push(dateKey(day));
+  return { start, end, keys };
+}
+
+/** Current local calendar week's crumbs, each with its first attached image. */
+export function useWeeklyCrumbs(targetUserId?: string, now = new Date()) {
+  const userId = useCurrentUserId();
+  const ownerId = targetUserId ?? userId;
+  const todayKey = dateKey(now);
+  return useAsync(async (): Promise<WeeklyCrumb[]> => {
+    const actor = currentActor();
+    const { keys } = weekBounds(now);
+    const rows = await api.crumbs.list(actor, ownerId);
+    const grouped = new Map<string, (typeof rows)[number][]>();
+    for (const crumb of rows) {
+      const key = dateKey(crumb.visitedAt);
+      if (keys.includes(key)) grouped.set(key, [...(grouped.get(key) ?? []), crumb]);
+    }
+    const days = await Promise.all([...grouped.keys()].map((key) => api.crumbs.day(actor, ownerId, key)));
+    const photoByCrumb = new Map<string, Photo>();
+    for (const day of days) {
+      for (const stop of day?.stops ?? []) {
+        if (stop.photo) photoByCrumb.set(stop.id, await resolvePhoto(stop.photo.storagePath));
+      }
+    }
+    return [...grouped.values()].flat().sort((a, b) => a.visitedAt.getTime() - b.visitedAt.getTime()).map((crumb) => ({
+      id: crumb.id,
+      placeName: crumb.placeName,
+      city: crumb.city,
+      latitude: crumb.latitude ?? null,
+      longitude: crumb.longitude ?? null,
+      visitedAt: crumb.visitedAt,
+      photo: photoByCrumb.get(crumb.id),
+    }));
+  }, [userId, ownerId, todayKey]);
+}
+
 /** The current user's crumbs that have map coordinates, newest first. */
 export function useMyCrumbs() {
   const userId = useCurrentUserId();
@@ -157,6 +208,35 @@ export function useMyCrumbs() {
         visitedAt: c.visitedAt,
       }));
   }, [userId]);
+}
+
+/** Shared, geolocated crumbs from accepted friends, newest first. */
+export function useFriendsMapCrumbs(friendId?: string, enabled = true) {
+  const userId = useCurrentUserId();
+  return useAsync(async (): Promise<FriendMapCrumb[]> => {
+    if (!userId || !enabled) return [];
+    const actor = currentActor();
+    const friends = friendId
+      ? [{ id: friendId, name: (await api.users.get(actor, friendId))?.profile.name ?? friendId }]
+      : await api.friends.list(actor, userId);
+    const rows = await Promise.all(
+      friends.map(async (friend) =>
+        (await api.crumbs.list(actor, friend.id))
+          .filter((crumb) => crumb.latitude != null && crumb.longitude != null)
+          .map((crumb) => ({
+            id: crumb.id,
+            friendId: friend.id,
+            friendName: friend.name,
+            placeName: crumb.placeName,
+            city: crumb.city,
+            latitude: crumb.latitude as number,
+            longitude: crumb.longitude as number,
+            visitedAt: crumb.visitedAt,
+          })),
+      ),
+    );
+    return rows.flat().sort((a, b) => b.visitedAt.getTime() - a.visitedAt.getTime());
+  }, [userId, friendId ?? 'all', enabled]);
 }
 
 export function useLoggedDays(year: number, month: number) {
@@ -276,7 +356,7 @@ export function useLinkedAccounts() {
 
 // ---- writes ----
 
-export function updateProfile(patch: { name?: string; handle?: string; bio?: string }) {
+export function updateProfile(patch: { name?: string; handle?: string; bio?: string; avatarPath?: string | null }) {
   return api.users.update(currentActor(), patch);
 }
 

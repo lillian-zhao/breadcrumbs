@@ -19,6 +19,8 @@ describe('crumbs.day', () => {
       .user('alicia')
       .crumb('walk', { userId: 'alicia', placeName: 'Morning walk', city: 'Pittsburgh', visitedAt: new Date(2024, 0, 15, 9, 15), note: 'A slow morning', audience: 'private', photoIds: ['p1'] })
       .crumb('cafe', { userId: 'alicia', placeName: 'Cafe', city: 'Pittsburgh', visitedAt: new Date(2024, 0, 15, 10, 30), note: null, audience: 'friends', photoIds: [] })
+      .crumb('next-day', { userId: 'alicia', placeName: 'Next day', city: 'Pittsburgh', visitedAt: new Date(2024, 0, 16, 9, 15) })
+      .crumb('other-user', { userId: 'lillian', placeName: 'Other user', city: 'Pittsburgh', visitedAt: new Date(2024, 0, 15, 9, 15) })
       .photo('p1', 'photos/alicia/p1.jpg');
     const api = createApi({ store: s });
 
@@ -41,6 +43,20 @@ describe('crumbs.day', () => {
     const api = createApi({ store: s });
     const day = await api.crumbs.day(alicia, 'lillian', '2024-01-15');
     expect(day?.stops[0].name).toBe('Cafe');
+  });
+
+  it('returns every shared crumb for the selected user and day, while hiding private crumbs that day', async () => {
+    const s = storeWithCrumbs()
+      .crumb('shared-one', { userId: 'lillian', placeName: 'Cafe', visitedAt: new Date(2024, 0, 15, 10), audience: 'friends' })
+      .crumb('private', { userId: 'lillian', placeName: 'Home', visitedAt: new Date(2024, 0, 15, 11), audience: 'private' })
+      .crumb('shared-two', { userId: 'lillian', placeName: 'Park', visitedAt: new Date(2024, 0, 15, 12), audience: 'friends' })
+      .crumb('other-day', { userId: 'lillian', placeName: 'Next day', visitedAt: new Date(2024, 0, 16, 10), audience: 'friends' })
+      .crumb('other-user', { userId: 'alicia', placeName: 'Alicia stop', visitedAt: new Date(2024, 0, 15, 10), audience: 'friends' });
+    const api = createApi({ store: s });
+
+    const day = await api.crumbs.day(alicia, 'lillian', '2024-01-15');
+
+    expect(day?.stops.map((stop) => stop.name)).toEqual(['Cafe', 'Park']);
   });
 
   it('denies a friend reading a private day', async () => {
@@ -111,13 +127,18 @@ describe('crumbs.create', () => {
       visitedAt: new Date(2024, 0, 15, 14),
       note: 'Tea with friends',
       audience: 'friends',
-      photoIds: [],
+      photoIds: ['photo_tea'],
+      latitude: 40.4432027,
+      longitude: -79.9428499,
     });
     expect(id).toBeTruthy();
     const crumbs = await s.listCrumbs('alicia');
     expect(crumbs).toHaveLength(1);
     expect(crumbs[0].placeName).toBe('HeyTea');
     expect(crumbs[0].audience).toBe('friends');
+    expect(crumbs[0].photoIds).toEqual(['photo_tea']);
+    expect(crumbs[0].latitude).toBe(40.4432027);
+    expect(crumbs[0].longitude).toBe(-79.9428499);
   });
 });
 

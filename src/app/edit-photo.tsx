@@ -2,8 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Caption, PageHeader, Photo, Pill, Screen, SectionHeading, TextField } from '@/components/ui';
-import { currentUser, todaysLog } from '@/data';
+import { Button, Caption, Card, PageHeader, Photo, Pill, Screen, SectionHeading, TextField } from '@/components/ui';
+import { emptyPhoto, updateProfile, useCurrentUser } from '@/data';
 import { pickImageFromLibrary } from '@/lib/image-picker';
 import { addPendingPhoto } from '@/lib/pending-photos';
 import { uploadPhoto } from '@/lib/upload';
@@ -13,13 +13,16 @@ type Tool = 'crop' | 'rotate';
 export default function EditPhoto() {
   const { from: fromParam } = useLocalSearchParams<{ from?: string }>();
   const fromProfile = (Array.isArray(fromParam) ? fromParam[0] : fromParam) === 'profile';
+  const { data: currentUser } = useCurrentUser();
   const [pickedUri, setPickedUri] = useState<string>();
   const [picking, setPicking] = useState(false);
+  const [saveError, setSaveError] = useState<string>();
   const photo = pickedUri
     ? { source: { uri: pickedUri } }
     : fromProfile
-      ? currentUser.avatar
-      : todaysLog.photos[0];
+      ? currentUser?.avatar ?? emptyPhoto
+      : emptyPhoto;
+  const hasOriginalPhoto = fromProfile && currentUser?.avatar.source != null;
   const [caption, setCaption] = useState(fromProfile ? '' : 'A little pause at Cafe.');
   const [tool, setTool] = useState<Tool>('crop');
 
@@ -41,12 +44,15 @@ export default function EditPhoto() {
       return;
     }
     setSaving(true);
+    setSaveError(undefined);
     try {
-      const { photoId } = await uploadPhoto(pickedUri);
-      if (!fromProfile) addPendingPhoto(photoId, pickedUri);
+      const { photoId, storagePath } = await uploadPhoto(pickedUri);
+      if (fromProfile) await updateProfile({ avatarPath: storagePath });
+      else addPendingPhoto(photoId, pickedUri);
       router.back();
     } catch (error) {
       console.warn(error);
+      setSaveError(error instanceof Error ? error.message : 'Could not save this photo. Try again.');
     } finally {
       setSaving(false);
     }
@@ -55,14 +61,20 @@ export default function EditPhoto() {
   return (
     <Screen edge="safeArea" topOffset={24} paddingHorizontal={24} withTabBar={false}>
       <PageHeader
-        back={{ label: fromProfile ? 'Profile' : 'Log a Day' }}
+        back={{ label: fromProfile ? 'Profile' : 'Add a Crumb' }}
         title={{ title: 'Edit this photo.', fontSize: 44, lineHeight: 49.28 }}
         subtitle={fromProfile ? 'Profile photo · Preview before saving' : 'A crumb from today · Preview to crop'}
         style={styles.header}
       />
 
       <View style={styles.content}>
-        <Photo photo={photo} style={styles.hero} />
+        {pickedUri || hasOriginalPhoto ? (
+          <Photo photo={photo} style={styles.hero} />
+        ) : (
+          <Card style={styles.placeholder}>
+            <Caption align="center">No photo selected</Caption>
+          </Card>
+        )}
 
         <Pill
           label={picking ? 'Opening library…' : 'Replace photo'}
@@ -99,6 +111,7 @@ export default function EditPhoto() {
           <Button label="Cancel" variant="secondary" fill onPress={() => router.back()} />
           <Button label={saving ? 'Saving…' : fromProfile ? 'Save photo' : 'Save to day'} fill onPress={saving ? undefined : save} />
         </View>
+        {saveError ? <Caption>{saveError}</Caption> : null}
       </View>
     </Screen>
   );
@@ -113,6 +126,11 @@ const styles = StyleSheet.create({
   },
   hero: {
     height: 320,
+  },
+  placeholder: {
+    height: 320,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tools: {
     flexDirection: 'row',
