@@ -47,3 +47,8 @@ firebase-adminsdk*.json
 /android
 
 /breadcrumbs_scrap
+# Local Firebase setup doc (one-time setup instructions)
+FIREBASE-SETUP.md
+
+# Local seed script (one-time Firebase data population)
+scripts/seed.js

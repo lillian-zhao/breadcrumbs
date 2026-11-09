@@ -60,22 +60,7 @@ settings -> Your apps -> Web app. The Google keys come from Google Cloud Console
 -> APIs & Services -> Credentials (enable "Places API (New)" and "Maps SDK for
 Android").
 
-### 2. Firebase console setup
-
-1. Authentication -> Sign-in method -> enable Email/Password.
-2. Firestore Database -> Create database (production mode) -> paste the security
-   rules at the bottom of this file.
-3. (Optional) Seed demo users, friendships, crumbs and saved places:
-
-~~~bash
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json node scripts/seed.js
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json node scripts/seed.js --list
-~~~
-
-Generate the service-account key in Firebase Console -> Project settings ->
-Service accounts -> Generate new private key.
-
-### 3. iOS (Apple Maps)
+### 2. iOS (Apple Maps)
 
 Requires Xcode 26.x (Swift 6.2) on macOS Sequoia 15.6 or later.
 
@@ -86,7 +71,7 @@ npx expo run:ios
 
 expo-maps needs iOS 18.0+.
 
-### 4. Android (Google Maps)
+### 3. Android (Google Maps)
 
 Requires JDK 17+ and the Android SDK (the NDK is auto-installed on first build).
 
@@ -130,86 +115,6 @@ That means the emulator's Google Play Services is out of date. Fix it by:
 Also confirm the Google Cloud key has "Maps SDK for Android" enabled - it is a
 separate toggle from "Places API (New)" (search works without it, maps do not).
 
-### 5. Demo accounts
-
-The seed script creates these Firebase Auth users (password demo123456 for all):
-
-- lillian@example.com
-- annie@example.com
-- alicia@example.com
-- tongtong@example.com
-- maggie@example.com
-
-### Firestore security rules
-
-Paste into Firebase Console -> Firestore Database -> Rules:
-
-~~~text
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function uid() { return request.auth.uid; }
-
-    match /users/{userId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn() && uid() == userId;
-      allow delete: if false;
-    }
-
-    match /friendships/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn() && (request.resource.data.userId == uid() || request.resource.data.friendId == uid());
-      allow update, delete: if signedIn() && (resource.data.userId == uid() || resource.data.friendId == uid());
-    }
-
-    match /blocks/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.blockerId == uid();
-      allow delete: if signedIn() && resource.data.blockerId == uid();
-      allow update: if false;
-    }
-
-    match /crumbs/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.userId == uid();
-      allow update: if signedIn() && resource.data.userId == uid();
-      allow delete: if false;
-    }
-
-    match /photos/{id} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
-      allow delete: if false;
-    }
-
-    match /savedPlaces/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.userId == uid();
-      allow update, delete: if signedIn() && resource.data.userId == uid();
-    }
-
-    match /albums/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.userId == uid();
-      allow update, delete: if signedIn() && resource.data.userId == uid();
-    }
-
-    match /preferences/{userId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn() && uid() == userId;
-      allow delete: if false;
-    }
-
-    match /linkedAccounts/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.userId == uid();
-      allow update: if signedIn() && resource.data.userId == uid();
-      allow delete: if false;
-    }
-  }
-}
-~~~
 ## Data-access API
 
 The data layer lives in src/api. It exposes typed functions that read and write
