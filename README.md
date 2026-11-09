@@ -31,20 +31,161 @@ cp .env.example .env     # then set EXPO_PUBLIC_FIREBASE_API_KEY in .env
 npx expo start
 ~~~
 
-Then scan the QR code with Expo Go, or press i / a for the iOS / Android
-simulator.
-
-No native plugins or config plugins are required: Firebase is the JS SDK only,
-which runs in Expo Go without a development build. The Firebase web API key is
-read from EXPO_PUBLIC_FIREBASE_API_KEY (set it in the gitignored .env file); the
-other config values in src/api/firebase.ts are public identifiers. Access is
-enforced by Firestore / Storage Security Rules, not by hiding the values.
+The app uses expo-maps (a native module), so it can NOT run in Expo Go. See
+"Running with maps (development build)" below for the full machine setup.
 
 A note on warnings: npm may print an "install-scripts ... not covered by
 allowScripts" warning for @firebase/util and protobufjs. Both postinstall scripts
 are optional for this app (the Firebase config is loaded from env rather than baked
 at install time), so the warning is safe to ignore.
 
+## Running with maps (development build)
+
+The app renders maps with expo-maps (Apple Maps on iOS, Google Maps on Android).
+Because maps are a native module, the app can NOT run in Expo Go - you need a
+native development build plus the right toolchain and API keys.
+
+### 1. Environment variables
+
+Create .env from .env.example and fill in three keys:
+
+~~~bash
+EXPO_PUBLIC_FIREBASE_API_KEY=...        # Firebase web API key
+EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=...   # Google Places API (New)
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=...     # Google Maps SDK for Android (optional on iOS)
+~~~
+
+.env is gitignored. The Firebase key comes from Firebase Console -> Project
+settings -> Your apps -> Web app. The Google keys come from Google Cloud Console
+-> APIs & Services -> Credentials (enable "Places API (New)" and "Maps SDK for
+Android").
+
+### 2. Firebase console setup
+
+1. Authentication -> Sign-in method -> enable Email/Password.
+2. Firestore Database -> Create database (production mode) -> paste the security
+   rules at the bottom of this file.
+3. (Optional) Seed demo users, friendships, crumbs and saved places:
+
+~~~bash
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json node scripts/seed.js
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json node scripts/seed.js --list
+~~~
+
+Generate the service-account key in Firebase Console -> Project settings ->
+Service accounts -> Generate new private key.
+
+### 3. iOS (Apple Maps)
+
+Requires Xcode 26.x (Swift 6.2) on macOS Sequoia 15.6 or later.
+
+~~~bash
+brew install cocoapods        # only if pod is missing
+npx expo run:ios
+~~~
+
+expo-maps needs iOS 18.0+.
+
+### 4. Android (Google Maps)
+
+Requires JDK 17+ and the Android SDK (the NDK is auto-installed on first build).
+
+~~~bash
+# JDK 17 (Homebrew)
+brew install openjdk@17
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+# tell Gradle where the Android SDK lives
+echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+# start an emulator first, then:
+npx expo run:android
+~~~
+
+The first build is slow (it compiles every native module); later builds are fast.
+
+### 5. Demo accounts
+
+The seed script creates these Firebase Auth users (password demo123456 for all):
+
+- lillian@example.com
+- annie@example.com
+- alicia@example.com
+- tongtong@example.com
+- maggie@example.com
+
+### Firestore security rules
+
+Paste into Firebase Console -> Firestore Database -> Rules:
+
+~~~text
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && uid() == userId;
+      allow delete: if false;
+    }
+
+    match /friendships/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (request.resource.data.userId == uid() || request.resource.data.friendId == uid());
+      allow update, delete: if signedIn() && (resource.data.userId == uid() || resource.data.friendId == uid());
+    }
+
+    match /blocks/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.blockerId == uid();
+      allow delete: if signedIn() && resource.data.blockerId == uid();
+      allow update: if false;
+    }
+
+    match /crumbs/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.userId == uid();
+      allow update: if signedIn() && resource.data.userId == uid();
+      allow delete: if false;
+    }
+
+    match /photos/{id} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    match /savedPlaces/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.userId == uid();
+      allow update, delete: if signedIn() && resource.data.userId == uid();
+    }
+
+    match /albums/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.userId == uid();
+      allow update, delete: if signedIn() && resource.data.userId == uid();
+    }
+
+    match /preferences/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && uid() == userId;
+      allow delete: if false;
+    }
+
+    match /linkedAccounts/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.userId == uid();
+      allow update: if signedIn() && resource.data.userId == uid();
+      allow delete: if false;
+    }
+  }
+}
+~~~
 ## Data-access API
 
 The data layer lives in src/api. It exposes typed functions that read and write
@@ -53,18 +194,19 @@ full Firestore schema and permission rules.
 
 Available namespaces and functions (from createApi({ store })):
 
-- users        - get, update
+- users        - get, update, search
 - friends      - list, status, request, accept, unfriend, block, unblock,
                  incoming, outgoing, highlights
-- crumbs       - day, daysForMonth, recentPhotos, weeks
+- crumbs       - day, daysForMonth, recentPhotos, weeks, create, list
 - places       - saved, save, remove
 - gallery      - sections, albums
+- photos       - add
 - preferences  - get, update
 - accounts     - list
 
 Every call takes an Actor (who is asking) so access control is enforced in one
-place. There is no sign-in yet, so pass '{ userId }' explicitly; when Firebase
-Auth is added, build the Actor from the signed-in user and nothing else changes.
+place. Sign-in is Firebase Auth (email/password); the app derives the Actor from
+the signed-in user automatically.
 
 ~~~ts
 import { createApi } from '@/api';
