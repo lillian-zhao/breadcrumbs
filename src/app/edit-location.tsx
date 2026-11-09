@@ -2,12 +2,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { LocationMap } from '@/components/LocationMap';
 import { Button, Caption, Card, ListRow, PageHeader, Pill, Screen, SearchField, SectionHeading } from '@/components/ui';
 import { nearbyPlaces } from '@/data';
 import { usePlaceSearch } from '@/hooks/usePlaceSearch';
-import { colors, fonts, mapColors } from '@/theme';
+import { colors, fonts } from '@/theme';
 
-type Suggestion = { id: string; name: string; subtitle: string };
+type Suggestion = { id: string; name: string; subtitle: string; latitude?: number; longitude?: number };
 
 export default function EditLocation() {
   const { stop: stopParam } = useLocalSearchParams<{ stop?: string }>();
@@ -22,6 +23,8 @@ export default function EditLocation() {
           id: place.id,
           name: place.name,
           subtitle: place.address || place.category,
+          latitude: place.latitude,
+          longitude: place.longitude,
         }))
       : nearbyPlaces.map((place) => ({ id: place.id, name: place.name, subtitle: place.subtitle }));
 
@@ -46,19 +49,12 @@ export default function EditLocation() {
           actionLabel="Locate"
         />
 
-        <View style={styles.miniMap} accessibilityLabel="Edit pin on Pittsburgh map">
-          <Text style={styles.mapCity}>PITTSBURGH</Text>
-          <View style={[styles.block, { left: 0, top: 0, backgroundColor: mapColors.block }]} />
-          <View style={[styles.block, { left: 124, top: 0, backgroundColor: mapColors.block }]} />
-          <View style={[styles.block, { left: 248, top: 0, backgroundColor: mapColors.block }]} />
-          <View style={[styles.block, { left: 0, top: 94, backgroundColor: mapColors.park }]} />
-          <View style={[styles.block, { left: 124, top: 94, backgroundColor: mapColors.block }]} />
-          <View style={[styles.block, { left: 248, top: 94, backgroundColor: mapColors.block }]} />
-          <View style={styles.cafeLabel}>
-            <Text style={styles.cafeName}>{selected?.name ?? ''}</Text>
-            <Text style={styles.cafeHint}>Drag to refine</Text>
-          </View>
-        </View>
+        <LocationMap
+          latitude={selected?.latitude}
+          longitude={selected?.longitude}
+          name={selected?.name}
+          style={styles.miniMap}
+        />
 
         <SectionHeading label="suggested places" fontSize={19} ruleOpacity={0.6} />
         <Card>
@@ -97,40 +93,7 @@ const styles = StyleSheet.create({
     height: 190,
     overflow: 'hidden',
     borderRadius: 12,
-    backgroundColor: mapColors.street,
-  },
-  mapCity: {
-    position: 'absolute',
-    left: 14,
-    top: 14,
-    zIndex: 1,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    color: colors.bark,
-  },
-  block: {
-    position: 'absolute',
-    width: 110,
-    height: 80,
-  },
-  cafeLabel: {
-    position: 'absolute',
-    left: 196,
-    top: 118,
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: colors.cream,
-    gap: 2,
-  },
-  cafeName: {
-    fontFamily: fonts.display,
-    fontSize: 13,
-    color: colors.ink,
-  },
-  cafeHint: {
-    fontFamily: fonts.body,
-    fontSize: 10,
-    color: colors.caption,
+    backgroundColor: colors.paper,
   },
   selectedHead: {
     flexDirection: 'row',
