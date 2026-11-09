@@ -106,6 +106,30 @@ npx expo run:android
 
 The first build is slow (it compiles every native module); later builds are fast.
 
+### If the map won't draw tiles (blank/gray map)
+
+Google Maps on Android runs through Google Play Services, not your app's APK.
+If the map mounts but never draws tiles, logcat shows:
+
+~~~text
+W Google Maps Android API: maps_core feature is module is not recognized;
+   Google Play Services may need to be updated. Requesting a module install will fail.
+~~~
+
+That means the emulator's Google Play Services is out of date. Fix it by:
+
+1. Opening Play Store -> profile avatar -> Settings -> About -> "Update Play
+   Store" and letting Google Play Services update (or just leave the emulator
+   online a few minutes; GMS self-updates in the background).
+2. If that doesn't take, update the emulator image: Android Studio -> SDK
+   Manager -> SDK Platforms -> install the latest "Google Play ... System Image",
+   then AVD Manager -> Cold Boot Now.
+3. `adb shell pm clear com.google.android.gms` forces GMS to re-initialize
+   (you'll sign back into Google on the emulator afterward).
+
+Also confirm the Google Cloud key has "Maps SDK for Android" enabled - it is a
+separate toggle from "Places API (New)" (search works without it, maps do not).
+
 ### 5. Demo accounts
 
 The seed script creates these Firebase Auth users (password demo123456 for all):
